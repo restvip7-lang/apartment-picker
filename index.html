@@ -1,3 +1,7 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
 <title>Выбор квартир</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -299,6 +303,8 @@ body.fs-open{overflow:hidden}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
+</head>
+<body>
 
 <div class="wrap">
   <header class="top">
@@ -1181,3 +1187,5 @@ document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return;
   if(!$('#tour').hidden) return tourEnd(); });
 { const {st,flt}=parse(location.hash); Object.assign(F,flt); APPLIED=''; CUR={level:'complex',b:null,f:null,sel:null,page:null}; apply(st,{}); BOOTED=true; try{ history.replaceState(null,'',hashOf(st)) }catch(e){} }
 </script>
+</body>
+</html>
