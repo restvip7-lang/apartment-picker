@@ -1,0 +1,1183 @@
+<title>Выбор квартир</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;700;800&display=swap">
+<style>
+/* Три экрана: комплекс → этаж → страница квартиры. Тёмный фон, светлые планы, янтарный акцент */
+:root{
+  --bg:#0b1220; --surface:#121b2b; --surface-2:#18243a; --fg:#eef2f7; --muted:#9aa6b8; --line:#24314a;
+  --accent:#f5b54a; --accent-ink:#1a1206; --sel:#ffb02e;
+  --free:#22a565; --booked:#c9a43a; --sold:#8a93a3;
+  --plan:#f6f4ef; --plan-ink:#1d2533;
+  --display:"Unbounded","Manrope",system-ui,sans-serif;
+  --body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:14px; --shadow:0 12px 32px rgba(0,0,0,.45);
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark}}
+:root[data-theme="dark"]{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding:20px max(16px,env(safe-area-inset-right,0px)) 40px max(16px,env(safe-area-inset-left,0px));overflow-x:hidden}
+.wrap{max-width:1240px;margin:0 auto;display:grid;gap:16px;min-width:0}
+h1,h2,h3{margin:0;text-wrap:balance}
+button{font:inherit;color:inherit}
+[hidden],.pg-hide{display:none!important}
+:focus-visible{outline:2px solid var(--sel);outline-offset:2px}
+
+/* ---------- Шапка ---------- */
+.top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between}
+.eyebrow{margin:0 0 4px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:800}
+.top h1{font-family:var(--display);font-weight:700;font-size:clamp(22px,3.2vw,34px);letter-spacing:-.01em}
+.summary{margin:4px 0 0;color:var(--muted);font-size:16px;font-variant-numeric:tabular-nums}
+.summary b{color:var(--fg)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:0 14px;min-height:44px;cursor:pointer;font-size:14px;color:var(--fg)}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg);font-weight:700}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);
+  background:transparent;color:var(--fg);font-weight:700;font-size:14px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.block{width:100%}
+.btn.link{border-color:transparent;color:var(--accent);padding:0 8px}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn[aria-pressed="true"].sl-btn{border-color:var(--free);color:#9be3bd}
+.badge{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:99px;background:var(--accent);color:var(--accent-ink);font-size:12px}
+.badge:empty{display:none}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.kpi{background:var(--surface);padding:12px 14px;display:grid;gap:2px;min-width:0}
+.kpi span,.kpi small{font-size:12px;color:var(--muted)}
+.kpi b{font-family:var(--display);font-weight:500;font-size:clamp(16px,2vw,20px);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ---------- Фильтры ---------- */
+.fbar{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 16px}
+.fgroup{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
+.flabel{font-weight:700;font-size:14px}
+.fbar input,.fbar select{font:inherit;font-size:14px;min-height:44px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);min-width:0}
+.fbar input{width:120px}
+.fbar select{width:auto}
+.fbar .seg button{padding:0 16px}
+.fbar .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.fbar .spacer{flex:1}
+.fsheet-head,.fsheet-foot{display:none}
+.fopen{display:none}
+
+/* ---------- Навигация ---------- */
+.crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:2px 6px;font-size:14px;color:var(--muted)}
+.crumbs button{border:0;background:none;color:var(--muted);cursor:pointer;min-height:44px;padding:0 6px}
+.crumbs button:hover{color:var(--fg)}
+.crumbs .cur{color:var(--accent);font-weight:700}
+.crumbs .sep{opacity:.6}
+
+/* ---------- Экран выбора: сцена + карточка ---------- */
+#picker{margin:0;max-width:none;width:100%}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+.stage{position:relative;border-radius:var(--r);overflow:hidden;background:#0f1a2e;min-width:0}
+.stage.render{aspect-ratio:1500/844}
+.stage.plan{background:#fff;height:clamp(440px,calc(100vh - 290px),720px)}
+.stage.plan.wide{height:auto;aspect-ratio:920/520}
+.stage svg{display:block;width:100%;height:100%;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.stage.zoomed svg,.stage.fs svg{touch-action:none;cursor:grab}
+.stage.zoomed svg:active{cursor:grabbing}
+.stage.fs{position:fixed;inset:0;z-index:60;border-radius:0;height:auto;aspect-ratio:auto}
+body.fs-open{overflow:hidden}
+.ctrls{position:absolute;right:12px;bottom:12px;display:flex;gap:8px;z-index:4}
+.ctrl{width:44px;height:44px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(11,18,32,.82);color:#fff;cursor:pointer;display:grid;place-items:center;font-size:20px;line-height:1}
+.ctrl.txt{width:auto;padding:0 12px;font-size:13px;font-weight:700}
+.ctrl:hover{background:rgba(11,18,32,.95)}
+.fsinfo{position:absolute;left:12px;bottom:12px;z-index:4;background:rgba(11,18,32,.9);color:#fff;border-radius:10px;padding:8px 8px 8px 12px;display:none;gap:10px;align-items:center;font-size:14px;max-width:calc(100% - 260px)}
+.stage.fs .fsinfo.on{display:flex}
+.scene-enter{opacity:0}
+.stage svg{transition:opacity .25s}
+
+/* интерактивные зоны */
+.zone{cursor:pointer;transition:fill .15s,stroke .15s}
+.bld{fill:rgba(245,181,74,0);stroke:rgba(245,181,74,0);stroke-width:2;vector-effect:non-scaling-stroke}
+.bld:hover,.bld.hov{fill:rgba(245,181,74,.18);stroke:#ffd08a}
+.bld.sel{fill:rgba(245,181,74,.30);stroke:var(--sel);stroke-width:3}
+.heat .bld{fill:var(--hf);stroke:rgba(255,255,255,.6);stroke-width:1.5}
+.heat .bld.sel{stroke:var(--sel);stroke-width:3}
+.band{fill:rgba(255,255,255,0);stroke:rgba(255,255,255,.35);stroke-width:1;vector-effect:non-scaling-stroke;cursor:pointer}
+.band:hover,.band.hov{fill:rgba(245,181,74,.5);stroke:#ffd08a;stroke-width:2}
+.flab{cursor:pointer}
+.flab.hov rect{fill:var(--accent)}
+.flat{stroke:rgba(29,37,51,.55);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.flat.free{fill:rgba(34,165,101,.30)} .flat.booked{fill:rgba(201,164,58,.38)} .flat.sold{fill:rgba(120,128,142,.42)}
+.flat.free:hover,.flat.free.hov{fill:rgba(34,165,101,.5)} .flat.booked:hover,.flat.booked.hov{fill:rgba(201,164,58,.58)} .flat.sold:hover,.flat.sold.hov{fill:rgba(120,128,142,.6)}
+.ring-o{fill:none;stroke:#fff;stroke-width:9;vector-effect:non-scaling-stroke;pointer-events:none;stroke-linejoin:round}
+.ring-i{fill:none;stroke:var(--sel);stroke-width:4.5;vector-effect:non-scaling-stroke;pointer-events:none;stroke-linejoin:round}
+.zone:focus{outline:none}
+.zone:focus-visible{stroke:#fff;stroke-width:3;stroke-dasharray:6 4}
+.pin{pointer-events:none}
+
+/* подсказка при наведении */
+.tip{position:absolute;z-index:5;max-width:250px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;box-shadow:var(--shadow);
+  pointer-events:none;font-size:13px;opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s}
+.tip.show{opacity:1;transform:none}
+.tip b{font-size:14px}
+.tip .h{color:var(--muted);font-size:12px;margin-top:4px}
+
+/* карточка справа */
+.side{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;display:grid;gap:14px;min-width:0}
+.side h2{font-family:var(--display);font-weight:700;font-size:24px}
+.side .muted{color:var(--muted);margin:0}
+.side .hl{color:var(--accent);font-weight:700;font-size:18px;margin:0}
+.big{font-family:var(--display);font-weight:700;font-size:30px;font-variant-numeric:tabular-nums;line-height:1.15}
+.rows{display:grid;border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;min-height:52px;padding:0 4px;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;cursor:pointer;width:100%}
+.row:hover{background:var(--surface-2)}
+.row b{font-size:17px}
+.row span{color:var(--muted)}
+.row[aria-pressed="true"]{background:var(--surface-2)}
+.row[aria-pressed="true"] b{color:var(--accent)}
+.row .chev{color:var(--muted);font-size:20px}
+.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px}
+.bgrid button{min-height:52px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);cursor:pointer;display:grid;place-items:center;line-height:1.15;padding:4px}
+.bgrid button b{font-size:16px}
+.bgrid button span{font-size:12px;color:#7fd3a7}
+.bgrid button:hover{border-color:var(--accent)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;margin:0;font-size:14px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:800;color:#fff;white-space:nowrap}
+.pill.free{background:var(--free)} .pill.booked{background:var(--booked);color:#1d1606} .pill.sold{background:var(--sold);color:#141a26}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+.thumb{background:#fff;border-radius:10px;aspect-ratio:4/3;display:grid;place-items:center;overflow:hidden}
+.thumb img,.thumb svg{width:100%;height:100%;object-fit:contain;display:block}
+.stack{display:grid;gap:8px}
+.salesbox{border-top:1px solid var(--line);padding-top:12px;display:grid;gap:8px;font-size:13px}
+.minibar{display:flex;gap:2px;height:8px;border-radius:4px;overflow:hidden}
+.note{font-size:12px;color:var(--muted);margin:0}
+
+.below{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;justify-content:space-between;color:var(--muted);font-size:13px}
+.legend{display:flex;gap:14px;flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.floorsw{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.floorsw button{min-width:44px;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:700}
+.floorsw button[aria-current="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.heatbar{display:inline-block;width:110px;height:8px;border-radius:4px;background:linear-gradient(90deg,hsla(42,92%,70%,.6),hsla(12,92%,48%,.95))}
+
+/* ---------- Список ---------- */
+.list{display:grid;gap:14px;margin-top:8px}
+.list-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;justify-content:space-between}
+.list-head h2{font-family:var(--display);font-weight:700;font-size:clamp(18px,2.4vw,24px)}
+.ctx{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:4px;min-height:44px;padding:0 6px 0 14px;border-radius:99px;border:1px solid var(--line);background:var(--surface);font-size:14px;cursor:pointer}
+.chip:hover{border-color:var(--accent)}
+.chip i{font-style:normal;color:var(--muted);font-size:18px;width:28px;text-align:center}
+.count{color:var(--muted);font-variant-numeric:tabular-nums}
+.list-head select{font:inherit;font-size:14px;min-height:44px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--fg)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:14px}
+.fcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:grid;grid-template-columns:132px minmax(0,1fr);gap:14px;min-width:0}
+.fcard:hover{border-color:#3a4a68}
+.fcard .thumb{aspect-ratio:1;align-self:start}
+.fcard .t{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.fcard .num{font-family:var(--display);font-weight:500;font-size:17px}
+.fcard .meta{color:var(--muted);font-size:13px}
+.fcard .pr{font-family:var(--display);font-weight:700;font-size:20px;font-variant-numeric:tabular-nums}
+.fcard .acts{display:flex;gap:8px;flex-wrap:wrap}
+.fcard .acts .btn{flex:1 1 auto;padding:0 12px;font-size:13px}
+.fcard .tw{position:relative;align-self:start}
+.fcard .heart{position:absolute;top:4px;right:4px;width:44px;height:44px;padding:0;font-size:20px;border-radius:50%;background:rgba(11,18,32,.85);border-color:transparent;color:#fff}
+.fcard .heart[aria-pressed="true"]{color:#ff8fa3}
+.more{justify-self:center}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:22px;display:grid;gap:12px;justify-items:start}
+.empty p{margin:0}
+
+/* ---------- Страница квартиры ---------- */
+.fpage{display:grid;gap:18px}
+.back{justify-self:start}
+.fhead{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+.fhead h1{font-family:var(--display);font-weight:700;font-size:clamp(26px,4vw,40px)}
+.fhead .pill{font-size:14px;padding:4px 12px}
+.params{margin:-8px 0 0;font-size:17px;color:var(--fg)}
+.params span{color:var(--muted);margin:0 6px}
+.banner{border:1px solid var(--line);border-left:4px solid var(--booked);background:var(--surface);border-radius:10px;padding:12px 14px}
+.banner.sold{border-left-color:var(--sold)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:0;background:none;min-height:44px;padding:0 14px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;font-weight:700}
+.tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+.fgrid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:18px;align-items:start}
+.gal{position:relative;background:#fff;border-radius:var(--r);overflow:hidden;aspect-ratio:4/3}
+.gal>img,.gal>svg.fp{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:18px}
+.gal .stage{position:absolute;inset:0;border-radius:0;height:auto}
+.gal .cap{position:absolute;left:14px;bottom:12px;font-size:12px;color:#6b7686;z-index:3}
+.gal.fs{position:fixed;inset:0;z-index:60;border-radius:0;aspect-ratio:auto}
+.buy{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;display:grid;gap:14px}
+.buy .big{font-size:clamp(26px,3vw,34px)}
+.card2{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;display:grid;gap:12px;min-width:0;align-content:start}
+.card2 h2{font-family:var(--display);font-weight:700;font-size:20px}
+.card2 p{margin:0}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+.chars{display:grid}
+.chars div{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;min-height:46px;border-bottom:1px solid var(--line)}
+.chars div:last-child{border-bottom:0}
+.chars i{font-style:normal;color:var(--accent);text-align:center}
+.chars b{text-align:right}
+.miniplan{background:#fff;border-radius:10px;border:0;padding:0;cursor:zoom-in;display:block;width:100%;aspect-ratio:16/10;overflow:hidden}
+.miniplan svg{width:100%;height:100%;display:block}
+.terms{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.term{border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;grid-template-columns:32px 1fr;gap:4px 12px;align-items:start}
+.term i{font-style:normal;font-size:22px;color:var(--accent);grid-row:span 2}
+.term span{color:var(--muted);font-size:14px}
+.stickybuy{display:none}
+
+/* ---------- Диалоги, тур, уведомления ---------- */
+.modal{position:fixed;inset:0;z-index:70;background:rgba(4,8,16,.66);display:grid;place-items:center;padding:16px}
+.dialog{background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);width:min(520px,100%);max-height:calc(100dvh - 32px);overflow:auto;padding:22px;display:grid;gap:14px;position:relative}
+.dialog h2{font-family:var(--display);font-size:20px;padding-right:40px}
+.dialog .x{position:absolute;top:8px;right:8px;width:44px;height:44px;border:0;background:none;color:var(--muted);font-size:24px;cursor:pointer}
+.sitem{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 6px 8px 12px;font-size:14px}
+.sitem .warn{grid-column:1/-1;color:#f2c76b;font-size:13px}
+.sitem .acts{display:flex;gap:4px}
+.sitem .acts .btn{min-height:40px;padding:0 10px;font-size:13px}
+.field{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+.field input,.field textarea{font:inherit;font-size:15px;color:var(--fg);min-height:44px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg)}
+.field textarea{min-height:84px;resize:vertical}
+.err{color:#ff8a7a;font-size:13px;margin:0}
+.msg{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:13px;white-space:pre-wrap;word-break:break-word}
+.demo-warn{border:1px solid #6b5520;background:#2a2312;color:#f2d79b;border-radius:10px;padding:12px;font-size:14px}
+.tour{position:fixed;z-index:75;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(520px,calc(100% - 32px));
+  background:var(--fg);color:var(--bg);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);display:grid;gap:8px}
+.tour p{margin:0;font-size:15px}
+.tour .st{font-size:12px;letter-spacing:.06em;text-transform:uppercase;opacity:.7}
+.tour .acts{display:flex;justify-content:flex-end;gap:8px}
+.tour .btn{color:var(--bg);border-color:rgba(127,127,127,.5)}
+.tour .btn.primary{color:var(--accent-ink)}
+.toast{position:fixed;z-index:80;left:50%;top:16px;transform:translate(-50%,-140%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:700;transition:transform .2s;max-width:calc(100% - 32px)}
+.toast.show{transform:translate(-50%,0)}
+.mkbar{position:absolute;z-index:8;left:12px;top:12px;max-width:min(420px,calc(100% - 24px));background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:12px 14px;display:grid;gap:8px;font-size:13px}
+.mkbar p{margin:0}
+.mkbar .acts{display:flex;gap:6px;flex-wrap:wrap}
+.mkbar select{font:inherit;min-height:36px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+.marking .band,.marking .flab{pointer-events:none}
+.mkexport{background:var(--surface);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;display:grid;gap:8px;font-size:13px}
+.mkexport textarea{font:12px ui-monospace,Menlo,monospace;width:100%;min-height:70px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:8px}
+
+/* ---------- Планшет и телефон ---------- */
+@media (max-width:980px){
+  .main,.fgrid{grid-template-columns:minmax(0,1fr)}
+  .two{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:720px){
+  body{padding-top:14px}
+  .actions{width:100%}
+  .actions .seg{flex:1 1 100%;display:flex}
+  .actions .seg button{flex:1}
+  .actions>.btn{flex:1 1 auto}
+  body.has-sticky .buy [data-act="ask"]{display:none}
+  .fopen{display:inline-flex}
+  .fbar{display:none;position:fixed;left:0;right:0;bottom:0;z-index:66;border-radius:16px 16px 0 0;max-height:85dvh;overflow:auto;
+    flex-direction:column;align-items:stretch;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px))}
+  .fbar.open{display:flex}
+  .fbar .fgroup{flex-direction:column;align-items:stretch}
+  .fbar input{width:100%}
+  .fbar .budget{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
+  .fbar .seg{display:grid;grid-template-columns:repeat(4,1fr)}
+  .fbar select{width:100%}
+  .fbar .spacer{display:none}
+  .fsheet-head{display:flex;justify-content:space-between;align-items:center}
+  .fsheet-head b{font-family:var(--display);font-size:18px}
+  .fsheet-foot{display:block}
+  .scrim{position:fixed;inset:0;z-index:65;background:rgba(4,8,16,.6)}
+  .stage.plan{height:auto;aspect-ratio:auto;padding-bottom:60px}
+  .stage.plan #sceneHost{aspect-ratio:1115/1550;height:auto!important}
+  .stage.plan.wide #sceneHost{aspect-ratio:920/520}
+  .stage.plan.fs #sceneHost{aspect-ratio:auto;height:100%!important}
+  .fcard{grid-template-columns:96px minmax(0,1fr)}
+  .terms{grid-template-columns:minmax(0,1fr)}
+  .side{padding:16px}
+  .ctrls{right:8px;bottom:8px;gap:6px}
+  .stickybuy{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--surface);border-top:1px solid var(--line);
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));gap:10px;align-items:center}
+  .stickybuy .btn{flex:1}
+  body.has-sticky{padding-bottom:96px}
+  .tour{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <p class="eyebrow">Демо · данные тестовые</p>
+      <h1 id="title">Выберите квартиру в комплексе</h1>
+      <p class="summary" id="summary" aria-live="polite"></p>
+    </div>
+    <div class="actions">
+      <div class="seg" id="fMode" role="group" aria-label="Режим просмотра">
+        <button data-v="buyer" aria-pressed="true">Покупатель</button><button data-v="sales" aria-pressed="false">Продажи</button>
+      </div>
+      <button class="btn" id="slBtn">♡ Подборка <span class="badge" id="slCount"></span></button>
+      <button class="btn" id="tourBtn">▶ Показать возможности</button>
+    </div>
+  </header>
+
+  <section class="kpis" id="kpis" hidden aria-label="Продажи"></section>
+
+  <button class="btn fopen" id="fOpen" aria-controls="fbar" aria-expanded="false">⚙ Фильтры <span class="badge" id="fCount"></span></button>
+  <div class="scrim" id="fScrim" hidden></div>
+  <section class="fbar" id="fbar" aria-label="Фильтры">
+    <div class="fsheet-head"><b>Фильтры</b><button class="btn" id="fClose" aria-label="Закрыть фильтры">✕</button></div>
+    <div class="fgroup"><span class="flabel">Бюджет, €</span>
+      <div class="budget" style="display:flex;gap:8px;align-items:center"><input id="fMin" inputmode="numeric" placeholder="От" aria-label="Бюджет от, евро"><span aria-hidden="true">–</span><input id="fMax" inputmode="numeric" placeholder="До" aria-label="Бюджет до, евро"></div></div>
+    <div class="fgroup"><span class="flabel">Планировка</span>
+      <div class="seg" id="fType" role="group" aria-label="Планировка"><button data-v="all" aria-pressed="true">Все</button><button data-v="1+1" aria-pressed="false">1+1</button><button data-v="2+1" aria-pressed="false">2+1</button><button data-v="3+1" aria-pressed="false">3+1</button></div></div>
+    <div class="fgroup"><label class="flabel" for="fB">Корпус</label><select id="fB"></select><label class="flabel" for="fF">Этаж</label><select id="fF"></select></div>
+    <span class="spacer"></span>
+    <button class="btn link" id="fReset">↺ Сбросить</button>
+    <div class="fsheet-foot"><button class="btn primary block" id="fApply">Показать</button></div>
+  </section>
+
+  <nav class="crumbs" id="crumbs" aria-label="Где вы сейчас"></nav>
+
+  <!-- Экраны 1 и 2 -->
+  <section id="picker" class="wrap" style="gap:12px">
+    <div class="main">
+      <div class="stage render" id="stage">
+        <div id="sceneHost" style="width:100%;height:100%"></div>
+        <div class="tip" id="tip" role="status"></div>
+        <div class="fsinfo" id="fsinfo"></div>
+        <div class="ctrls" id="ctrls">
+          <button class="ctrl" data-c="out" aria-label="Уменьшить">−</button>
+          <button class="ctrl" data-c="in" aria-label="Увеличить">+</button>
+          <button class="ctrl txt" data-c="fit" aria-label="Вписать целиком">Вписать</button>
+          <button class="ctrl" data-c="fs" aria-label="Во весь экран">⛶</button>
+        </div>
+        <div class="mkbar" id="mkBar" hidden></div>
+      </div>
+      <aside class="side" id="side" aria-live="polite"></aside>
+    </div>
+    <div class="below">
+      <div class="legend" id="legend">
+        <span><i class="dot" style="background:var(--free)"></i>Свободна</span>
+        <span><i class="dot" style="background:var(--booked)"></i>Бронь</span>
+        <span><i class="dot" style="background:var(--sold)"></i>Продана</span>
+      </div>
+      <div class="legend" id="heatLegend" hidden><span>Продано и в брони:</span><span>меньше</span><i class="heatbar"></i><span>больше</span></div>
+      <div class="floorsw" id="floorsw"></div>
+      <span id="hint"></span>
+    </div>
+    <div class="mkexport" id="mkExport" hidden></div>
+
+    <section class="list" id="list" aria-label="Список квартир">
+      <div class="list-head">
+        <h2 id="listTitle">Свободные квартиры</h2>
+        <div class="ctx"><div class="ctx" id="ctxChips"></div><span class="count" id="count"></span>
+          <select id="fSort" aria-label="Сортировка"><option value="price">Сначала дешевле</option><option value="-price">Сначала дороже</option><option value="area">По площади</option><option value="-floor">Выше этаж</option></select></div>
+      </div>
+      <div class="grid" id="grid"></div>
+      <button class="btn more" id="more" hidden>Показать ещё</button>
+    </section>
+  </section>
+
+  <!-- Экран 3 -->
+  <section id="fpage" class="fpage" hidden></section>
+</div>
+
+<div class="tour" id="tour" hidden role="dialog" aria-label="Показ возможностей"><div class="st" id="tourStep"></div><p id="tourText"></p><div class="acts"><button class="btn" id="tourStop">Закончить</button><button class="btn primary" id="tourNext">Далее →</button></div></div>
+<div class="modal" id="modal" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="stickybuy" id="stickybuy" hidden></div>
+
+<script>
+/* ===================== ДАННЫЕ (единый источник; на сайте придут из базы / Bitrix24) ===================== */
+/* Контуры корпусов на рендере 1500×844: p — контур, t/b — верхняя и нижняя линии фасада, f — этажей */
+const GEO = {"E":{"f":5,"p":[[355,92],[400,75],[560,72],[600,92],[600,210],[380,215],[362,195]],"t":[[360,102],[452,104],[478,97],[598,97]],"b":[[360,212],[452,212],[478,204],[598,204]]},"F":{"f":5,"p":[[618,100],[690,88],[790,98],[848,128],[815,280],[770,285],[700,240],[620,215]],"t":[[612,104],[700,119],[745,140],[770,141],[848,148]],"b":[[612,211],[700,224],[745,247],[770,248],[848,255]]},"G":{"f":5,"p":[[785,75],[840,50],[890,48],[1005,55],[1013,70],[1012,185],[860,195],[848,128],[790,98]],"t":[[850,88],[935,88],[958,74],[1012,74]],"b":[[850,182],[935,180],[958,174],[1012,174]]},"A":{"f":5,"p":[[35,190],[60,180],[260,175],[300,205],[240,235],[240,340],[200,345],[55,330],[45,240]],"t":[[45,207],[140,207],[208,216],[238,228]],"b":[[45,310],[140,310],[208,312],[238,334]]},"H":{"f":5,"p":[[1112,182],[1250,172],[1320,180],[1385,215],[1397,330],[1350,358],[1255,358],[1200,345],[1165,330],[1165,225]],"t":[[1112,222],[1245,220],[1270,232],[1300,226],[1395,221]],"b":[[1112,330],[1245,330],[1270,338],[1300,330],[1395,325]]},"B":{"f":5,"p":[[242,230],[238,242],[244,259],[242,280],[244,337],[228,341],[232,374],[279,387],[312,416],[345,424],[387,432],[395,420],[395,399],[415,389],[417,341],[415,304],[413,288],[419,275],[436,271],[467,271],[465,261],[452,259],[415,234],[378,228],[325,222],[271,222]],"t":[[244,245],[300,258],[370,274],[392,290],[416,290]],"b":[[244,350],[300,367],[370,383],[392,400],[416,400]]},"I":{"f":5,"p":[[950,262],[1000,215],[1140,218],[1165,225],[1165,335],[1150,350],[1060,350],[990,330],[950,300]],"t":[[950,262],[1060,266],[1100,262],[1165,245]],"b":[[950,372],[1060,376],[1100,372],[1165,345]]},"C":{"f":5,"p":[[410,290],[470,272],[560,276],[617,310],[600,335],[545,350],[536,475],[450,480]],"t":[[410,306],[470,316],[535,330]],"b":[[410,425],[470,437],[535,450]]},"J":{"f":5,"p":[[943,305],[1085,300],[1135,352],[1015,388],[1010,440],[950,445],[945,380]],"t":[[948,343],[1000,362],[1125,362]],"b":[[948,453],[1000,472],[1125,472]]},"D":{"f":5,"p":[[549,349],[541,366],[545,379],[571,380],[554,396],[549,443],[552,471],[534,475],[534,507],[599,529],[693,567],[742,559],[744,516],[744,473],[719,460],[727,452],[796,449],[798,445],[766,441],[762,422],[770,411],[794,406],[794,383],[753,342],[684,336],[607,340]],"t":[[536,362],[575,372],[625,385],[667,395],[745,410]],"b":[[536,490],[575,500],[625,515],[667,526],[745,540]]},"N":{"f":5,"p":[[770,415],[830,410],[990,440],[1012,462],[1010,520],[850,515],[810,530],[800,555],[760,560],[760,440]],"t":[[752,500],[800,489],[899,477],[1012,460]],"b":[[752,650],[800,639],[899,617],[1012,585]]},"K":{"f":5,"p":[[1010,392],[1050,385],[1270,392],[1305,415],[1300,505],[1130,505],[1127,580],[1080,600],[1035,585],[1020,420]],"t":[[1040,438],[1100,450],[1200,452],[1300,442]],"b":[[1040,568],[1100,573],[1200,572],[1300,562]]},"L":{"f":5,"p":[[810,530],[850,515],[1035,518],[1075,600],[1070,750],[1030,765],[905,765],[805,660]],"t":[[806,545],[865,550],[925,609],[975,610],[985,607],[1070,607]],"b":[[806,680],[865,685],[925,748],[975,748],[985,746],[1070,746]]},"M":{"f":5,"p":[[1127,503],[1300,500],[1370,507],[1410,585],[1410,725],[1300,760],[1195,755],[1130,620]],"t":[[1127,524],[1185,532],[1230,590],[1295,596],[1305,592],[1405,592]],"b":[[1127,669],[1185,677],[1230,724],[1295,730],[1305,724],[1405,724]]}};
+const IMG = {src:'complex.jpg', w:1500, h:844};
+const FULL = [0,0,IMG.w,IMG.h];
+
+/* Корпус L: исходный план этажа floor-l.jpg (1055×1490). Контуры квартир в пикселях этого файла, номер = номер на плане */
+const L_IMG = {src:'floor-l.jpg', w:1055, h:1490};
+const KP = {"1":[[781,775],[553,775],[553,1000],[856,1000],[856,878],[781,878]],"2":[[781,545],[553,545],[553,775],[856,775],[856,655],[781,655]],"3":[[737,230],[865,320],[907,377],[977,405],[910,512],[850,460],[840,462],[785,550],[590,417],[685,297]],"4":[[686,22],[940,220],[1007,272],[930,380],[865,320],[737,230],[693,283],[640,262],[547,202]],"5":[[826,1005],[558,1005],[558,1110],[648,1110],[648,1405],[781,1405],[781,1118],[826,1118]],"6":[[405,1110],[648,1110],[648,1400],[405,1400]],"7":[[227,1005],[495,1005],[495,1110],[405,1110],[405,1405],[272,1405],[272,1118],[227,1118]],"8":[[272,775],[500,775],[500,1000],[197,1000],[197,878],[272,878]],"9":[[272,545],[500,545],[500,775],[197,775],[197,655],[272,655]],"10":[[77,405],[120,377],[317,227],[380,330],[462,420],[280,542],[200,457],[147,505]],"11":[[44,270],[100,220],[117,212],[370,22],[505,200],[415,268],[360,245],[317,227],[180,325],[122,376]]};
+const BADGE = {"11":[268,233],"10":[283,397],"4":[785,233],"3":[780,393],"9":[390,686],"2":[668,686],"8":[380,912],"1":[673,912],"7":[343,1187],"6":[541,1225],"5":[713,1187]};
+const L_TEMPLATE = [1,2,3,4,5,6,7,8,9,10,11].map(n=>({n, type:'1+1', area:{1:58,2:58,3:60,4:64,5:52,6:62,7:52,8:58,9:58,10:60,11:64}[n], outdoor:n===6?'терраса':'балкон'}));
+/* Остальные корпуса: схематичный этаж для демо (реальных планов пока нет) */
+const FLOOR_TEMPLATE = [
+  {n:1,type:'3+1',area:122},{n:2,type:'1+1',area:56},{n:3,type:'2+1',area:86},
+  {n:4,type:'2+1',area:81},{n:5,type:'1+1',area:52},{n:6,type:'2+1',area:78}];
+const PLAN = {1:[160,140,300,200],2:[460,140,260,200],3:[720,140,320,200],4:[160,380,280,200],5:[560,380,220,200],6:[780,380,260,200]};
+
+function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R = rng(20261027);
+let SAVED={}; try{ SAVED=JSON.parse(localStorage.getItem('floorMarkup')||'{}')||{} }catch(e){}
+Object.entries(SAVED).forEach(([id,g])=>{ if(GEO[id]) GEO[id]={...GEO[id],...g} });
+const FLAT = {};
+function setGeo(b,g){
+  b.g=g; b.floors=g.f;
+  const xs=g.p.map(q=>q[0]), ys=g.p.map(q=>q[1]);
+  b.box=[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];
+  const r2=rng(b.id.charCodeAt(0)*7919);
+  (b.flats||[]).forEach(q=>delete FLAT[q.num]); b.flats=[];
+  b.tpl = b.id==='L'? L_TEMPLATE : FLOOR_TEMPLATE;
+  for(let f=1; f<=b.floors; f++) b.tpl.forEach(t=>{
+    const r=r2(), status = r<0.47?'sold':r<0.6?'booked':'free';
+    const prem = 1+(f-1)*0.015;
+    const num = b.tpl.length>9? `${b.id}-${f}${String(t.n).padStart(2,'0')}` : `${b.id}-${f}0${t.n}`;
+    const q={num, b:b.id, floor:f, n:t.n, type:t.type, area:t.area, status,
+      price: Math.round(t.area*b.ppm*prem/500)*500,
+      baths: t.type==='3+1'?2:1, outdoor:t.outdoor||'балкон',
+      img: b.id==='L'? `apt-${String(t.n).padStart(2,'0')}.jpg` : null, photos:[]};
+    b.flats.push(q); FLAT[num]=q;
+  });
+}
+const BUILDINGS = Object.entries(GEO).sort((a,b)=>a[0].localeCompare(b[0])).map(([id,g])=>{
+  const b={id, name:'Корпус '+id, ppm:2100+Math.round(R()*12)*50}; setGeo(b,g); return b });
+const BY = Object.fromEntries(BUILDINGS.map(b=>[b.id,b]));
+const ALL = () => BUILDINGS.flatMap(b=>b.flats);
+
+/* ===================== Утилиты ===================== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const eur = v => v==null? 'Цена по запросу' : '€'+v.toLocaleString('ru-RU');
+const meur = v => '€'+(v/1e6).toLocaleString('ru-RU',{maximumFractionDigits:1})+' млн';
+const plural = (n,a,b,c) => { const m=n%10, h=n%100; return m===1&&h!==11?a : m>=2&&m<=4&&(h<10||h>=20)?b : c };
+const nFlats = n => `${n} ${plural(n,'квартира','квартиры','квартир')}`;
+const nFree = n => `${n} ${plural(n,'свободная квартира','свободные квартиры','свободных квартир')}`;
+const STATUS = {free:'Свободна', booked:'Бронь', sold:'Продана'};
+const pts = p => p.map(q=>q.join(',')).join(' ');
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const wait = ms => new Promise(r=>setTimeout(r, reduced?0:ms));
+function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('show'); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.remove('show'),2600) }
+
+/* ===================== Фильтры и выборка ===================== */
+const F = {min:null, max:null, type:'all', sort:'price'};
+const okType = q => F.type==='all' || q.type===F.type;
+const okBudget = q => (F.min==null || (q.price!=null && q.price>=F.min)) && (F.max==null || (q.price!=null && q.price<=F.max));
+const fits = q => q.status==='free' && okType(q) && okBudget(q);
+const minOf = list => { const p=list.filter(q=>q.price!=null).map(q=>q.price); return p.length?Math.min(...p):null };
+const activeFilters = () => (F.min!=null?1:0)+(F.max!=null?1:0)+(F.type!=='all'?1:0);
+
+/* ===================== Состояние и адрес ===================== */
+// CUR: что выбрано. level: complex | facade | floor; page — номер квартиры для отдельной страницы
+let CUR = {level:'complex', b:null, f:null, sel:null, page:null};
+let LASTPICK = null;           // откуда открыли страницу квартиры (для возврата)
+const SCROLL = {};             // позиция прокрутки по экранам
+const VB = {};                 // масштаб и положение плана по экранам
+let MODE = 'buyer', APPLIED = '', BOOTED = false;
+function hashOf(st){
+  let p = st.page? `/flat/${st.page}` : !st.b? '/' : st.level==='facade'? `/b/${st.b}/facade` : st.f? `/b/${st.b}/f/${st.f}${st.sel?'/q/'+st.sel:''}` : `/b/${st.b}`;
+  const q=new URLSearchParams(); if(F.type!=='all') q.set('t',F.type); if(F.min!=null) q.set('min',F.min); if(F.max!=null) q.set('max',F.max);
+  const s=q.toString(); return '#'+p+(s?'?'+s:'');
+}
+function parse(h){
+  h=(h||'').replace(/^#/,''); const [path,qs]=h.split('?'), seg=path.split('/').filter(Boolean).map(decodeURIComponent);
+  const st={level:'complex', b:null, f:null, sel:null, page:null};
+  if(seg[0]==='flat' && FLAT[seg[1]]) st.page=seg[1];
+  else if(seg[0]==='b' && BY[seg[1]]){
+    st.b=seg[1];
+    if(seg[2]==='facade') st.level='facade';
+    if(seg[2]==='f' && +seg[3]>=1 && +seg[3]<=BY[st.b].floors){ st.f=+seg[3]; st.level='floor';
+      const q=FLAT[seg[5]]; if(seg[4]==='q' && q && q.b===st.b && q.floor===st.f) st.sel=q.num }
+  }
+  const p=new URLSearchParams(qs||''), num=k=>{ const v=parseInt(p.get(k),10); return isFinite(v)&&v>0?v:null };
+  return {st, flt:{type:['1+1','2+1','3+1'].includes(p.get('t'))?p.get('t'):'all', min:num('min'), max:num('max')}};
+}
+function setHash(h, replace){
+  try{ if(replace) history.replaceState(null,'',h); else history.pushState(null,'',h) }
+  catch(e){ try{ if(!replace) location.hash=h }catch(_){} }
+}
+// Перейти в состояние: меняем адрес и сразу рисуем
+function go(patch, opt={}){
+  const st={level:'complex', b:null, f:null, sel:null, page:null, ...patch};
+  if(st.level!=='floor'){ st.f=null; st.sel=null }
+  const h=hashOf(st); if(h===APPLIED && !opt.force) return;
+  setHash(h, !!opt.replace); apply(st, opt);
+}
+// Изменить только фильтры (без новой записи в истории)
+function setFilters(patch){ Object.assign(F,patch); go({...CUR}, {replace:true, force:true}) }
+addEventListener('popstate', ()=>{ if(location.hash!==APPLIED){ const {st,flt}=parse(location.hash); Object.assign(F,flt); apply(st,{}) } });
+addEventListener('hashchange', ()=>{ if(location.hash!==APPLIED){ const {st,flt}=parse(location.hash); Object.assign(F,flt); apply(st,{}) } });
+let scrollT; addEventListener('scroll',()=>{ clearTimeout(scrollT); scrollT=setTimeout(()=>{ SCROLL[keyOf(CUR)]=scrollY },80) },{passive:true});
+const keyOf = st => st.page? 'page:'+st.page : 'pick:'+st.level+'|'+(st.b||'')+'|'+(st.f||'');
+
+function apply(st, opt){
+  const prev=CUR; APPLIED=hashOf(st);
+  if(st.page){
+    if(!prev.page) LASTPICK=BOOTED?{...prev, y:scrollY}:null;
+    CUR=st; showPage(prev); return;
+  }
+  const fromPage=!!prev.page; CUR=st;
+  $('#fpage').hidden=true; $('#picker').hidden=false; stickyBuy(null);
+  renderPicker(prev, fromPage);
+  if(fromPage){ const y=(LASTPICK&&keyOf(LASTPICK)===keyOf(st))?LASTPICK.y:SCROLL[keyOf(st)]; if(y!=null) requestAnimationFrame(()=>scrollTo(0,y)) }
+}
+
+/* ===================== Шапка, фильтры, навигация ===================== */
+function renderTop(){
+  const t=CUR.page? 'Квартира '+CUR.page : CUR.level==='floor'? 'Выберите квартиру на этаже' : CUR.level==='facade'? 'Выберите этаж' : 'Выберите квартиру в комплексе';
+  $('#title').textContent=CUR.page?'Выбор квартир':t; document.title=t;
+  ['#fbar','#summary','#fOpen','#crumbs'].forEach(id=>$(id).classList.toggle('pg-hide',!!CUR.page));
+  const list=ALL().filter(fits), mp=minOf(list);
+  $('#summary').innerHTML=`<b>${BUILDINGS.length}</b> ${plural(BUILDINGS.length,'корпус','корпуса','корпусов')} · <b>${list.length}</b> ${plural(list.length,'свободная квартира','свободные квартиры','свободных квартир')}${mp?` · от <b>${eur(mp)}</b>`:''}${activeFilters()?' <span style="color:var(--accent)">· по фильтрам</span>':''}`;
+  $('#kpis').hidden = MODE!=='sales'; if(MODE==='sales') kpis();
+  $('#fCount').textContent = activeFilters()||'';
+  if(!CUR.page){ const n=listScope().length; $('#fApply').textContent=`Показать ${n} ${plural(n,'вариант','варианта','вариантов')}` }
+  // фильтры
+  $('#fMin').value = F.min??''; $('#fMax').value = F.max??'';
+  document.querySelectorAll('#fType button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.v===F.type));
+  const fb=$('#fB'), b=CUR.page? null : CUR.b;
+  fb.innerHTML='<option value="">Все корпуса</option>'+BUILDINGS.map(x=>`<option value="${x.id}" ${x.id===b?'selected':''}>${x.name}</option>`).join('');
+  const ff=$('#fF'); ff.disabled=!b;
+  ff.innerHTML='<option value="">Все этажи</option>'+(b?Array.from({length:BY[b].floors},(_,i)=>i+1).map(i=>`<option value="${i}" ${i===CUR.f?'selected':''}>${i} этаж</option>`).join(''):'');
+  // хлебные крошки
+  const c=[]; const bt=(t,fn,cur)=>cur?`<span class="cur" aria-current="page">${t}</span>`:`<button data-cr="${fn}">${t}</button>`;
+  if(CUR.page){ const q=FLAT[CUR.page];
+    c.push(bt('Комплекс','c'),`<span class="sep">→</span>`,bt('Корпус '+q.b,'b:'+q.b),`<span class="sep">→</span>`,bt('Этаж '+q.floor,'f:'+q.b+':'+q.floor),`<span class="sep">→</span>`,bt('Квартира '+q.num,'',true));
+  } else {
+    c.push(bt('Комплекс','c',!CUR.b));
+    if(CUR.b){ c.push(`<span class="sep">→</span>`, bt('Корпус '+CUR.b,'b:'+CUR.b, CUR.level==='complex')) }
+    if(CUR.level==='facade') c.push(`<span class="sep">→</span>`,bt('Выбор этажа','',true));
+    if(CUR.level==='floor') c.push(`<span class="sep">→</span>`,bt('Этаж '+CUR.f,'',true));
+  }
+  $('#crumbs').innerHTML=c.join('');
+  $('#crumbs').querySelectorAll('[data-cr]').forEach(x=>x.onclick=()=>{ const v=x.dataset.cr.split(':');
+    if(v[0]==='c') go({}); else if(v[0]==='b') go({b:v[1]}); else if(v[0]==='f') go({b:v[1],f:+v[2],level:'floor'}) });
+}
+const digits = v => { const n=parseInt(String(v).replace(/\D/g,''),10); return isFinite(n)&&n>0?n:null };
+let budgetT;
+['#fMin','#fMax'].forEach(id=>$(id).addEventListener('input',()=>{ clearTimeout(budgetT); budgetT=setTimeout(()=>setFilters({min:digits($('#fMin').value), max:digits($('#fMax').value)}),450) }));
+['#fMin','#fMax'].forEach(id=>$(id).addEventListener('keydown',e=>{ if(e.key==='Enter'){ clearTimeout(budgetT); setFilters({min:digits($('#fMin').value), max:digits($('#fMax').value)}) } }));
+document.querySelectorAll('#fType button').forEach(b=>b.onclick=()=>setFilters({type:b.dataset.v}));
+$('#fB').onchange=e=>{ const v=e.target.value; if(!v) go({}); else go({b:v}) };            // смена корпуса сбрасывает этаж
+$('#fF').onchange=e=>{ const v=+e.target.value, b=CUR.b; if(!b) return; if(v) go({b,f:v,level:'floor'}); else go({b,level:'facade'}) };
+$('#fReset').onclick=()=>setFilters({min:null,max:null,type:'all'});
+$('#fSort').onchange=e=>{ F.sort=e.target.value; renderList() };
+function sheet(open){ $('#fbar').classList.toggle('open',open); $('#fScrim').hidden=!open; $('#fOpen').setAttribute('aria-expanded',open); if(open) $('#fMin').focus() }
+$('#fOpen').onclick=()=>sheet(true); $('#fClose').onclick=()=>sheet(false); $('#fScrim').onclick=()=>sheet(false);
+$('#fApply').onclick=()=>{ clearTimeout(budgetT); setFilters({min:digits($('#fMin').value), max:digits($('#fMax').value)}); sheet(false); $('#list').scrollIntoView({behavior:reduced?'auto':'smooth'}) };
+
+/* ===================== Масштаб и перемещение (общий для рендера и планов) ===================== */
+function makeViewer(stageEl, svg, base, key, opt={}){
+  let vb=(VB[key]||base).slice();
+  const v={base, dragging:false};
+  const set=()=>{ svg.setAttribute('viewBox',vb.join(' ')); VB[key]=vb.slice(); stageEl.classList.toggle('zoomed', vb[2]<base[2]-0.5) };
+  const scale=w=>{ const r=svg.getBoundingClientRect(); return Math.min(r.width/w[2], r.height/w[3]) };
+  const clamp=()=>{ vb[0]=Math.max(base[0],Math.min(base[0]+base[2]-vb[2],vb[0])); vb[1]=Math.max(base[1],Math.min(base[1]+base[3]-vb[3],vb[1])) };
+  const toSvg=(x,y)=>{ const r=svg.getBoundingClientRect(), s=scale(vb), ox=(r.width-vb[2]*s)/2, oy=(r.height-vb[3]*s)/2; return [vb[0]+(x-r.left-ox)/s, vb[1]+(y-r.top-oy)/s] };
+  v.zoom=(f,cx,cy)=>{ if(cx==null){cx=vb[0]+vb[2]/2; cy=vb[1]+vb[3]/2}
+    const z=Math.max(1,Math.min(opt.max||5, base[2]/vb[2]*f)), w=base[2]/z, h=base[3]/z;
+    vb=[cx-(cx-vb[0])*w/vb[2], cy-(cy-vb[1])*h/vb[3], w, h]; clamp(); set() };
+  v.fit=()=>{ vb=base.slice(); set() };
+  v.get=()=>vb.slice();
+  v.set=x=>{ vb=x.slice(); set() };
+  const P=new Map(); let start=null, moved=false, pinch=null, suppress=false;
+  svg.addEventListener('pointerdown',e=>{ P.set(e.pointerId,[e.clientX,e.clientY]);
+    if(P.size===1){ start={x:e.clientX,y:e.clientY,vb:vb.slice()}; moved=false }
+    if(P.size===2){ const [a,b]=[...P.values()]; pinch={d:Math.hypot(a[0]-b[0],a[1]-b[1]), vb:vb.slice(), c:toSvg((a[0]+b[0])/2,(a[1]+b[1])/2)} } });
+  svg.addEventListener('pointermove',e=>{ if(!P.has(e.pointerId)) return; P.set(e.pointerId,[e.clientX,e.clientY]);
+    if(P.size===2 && pinch){ const [a,b]=[...P.values()]; vb=pinch.vb.slice(); v.zoom(Math.hypot(a[0]-b[0],a[1]-b[1])/pinch.d, ...pinch.c); moved=true; v.dragging=true; return }
+    if(!start) return; const dx=e.clientX-start.x, dy=e.clientY-start.y;
+    if(!moved && Math.hypot(dx,dy)<6) return;
+    if(start.vb[2]>=base[2]-0.5) return;               // целиком вписан — двигать нечего
+    if(!moved){ moved=true; v.dragging=true; try{svg.setPointerCapture(e.pointerId)}catch(_){} hideTip() }
+    const s=scale(start.vb); vb=[start.vb[0]-dx/s, start.vb[1]-dy/s, vb[2], vb[3]]; clamp(); set() });
+  const end=e=>{ P.delete(e.pointerId); if(P.size<2) pinch=null; if(!P.size){ if(moved){ suppress=true; setTimeout(()=>{suppress=false; v.dragging=false},0) } start=null; moved=false } };
+  svg.addEventListener('pointerup',end); svg.addEventListener('pointercancel',end);
+  svg.addEventListener('click',e=>{ if(suppress){ e.stopPropagation(); e.preventDefault() } },true);
+  svg.addEventListener('wheel',e=>{ if(!(e.ctrlKey||e.metaKey||stageEl.classList.contains('fs'))) return; e.preventDefault(); v.zoom(e.deltaY<0?1.15:1/1.15, ...toSvg(e.clientX,e.clientY)) },{passive:false});
+  set(); return v;
+}
+function animVB(svg, from, to, ms){
+  return new Promise(res=>{
+    if(reduced){ svg.setAttribute('viewBox',to.join(' ')); return res() }
+    const t0=performance.now(), ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+    (function step(now){ const p=Math.min(1,(now-t0)/ms), k=ease(p);
+      svg.setAttribute('viewBox', from.map((x,i)=>x+(to[i]-x)*k).join(' ')); p<1?requestAnimationFrame(step):res() })(t0);
+  });
+}
+function fsToggle(el, on){
+  on = on ?? !el.classList.contains('fs');
+  el.classList.toggle('fs',on); document.body.classList.toggle('fs-open',on);
+  const b=el.querySelector('[data-c="fs"]'); if(b){ b.textContent=on?'✕':'⛶'; b.setAttribute('aria-label',on?'Выйти из полноэкранного режима':'Во весь экран') }
+  hideTip();
+}
+
+/* ===================== Сцены ===================== */
+const stageEl=$('#stage'), host=$('#sceneHost'), tip=$('#tip');
+let viewer=null, svgEl=null, mountedSig='', zones={};
+
+function frameFor(b){
+  const [x0,y0,x1,y1]=b.box, bw=x1-x0, bh=y1-y0;
+  let H=Math.min(IMG.h, Math.max(bh*1.35,(bw+bh*0.9)/(IMG.w/IMG.h))), W=H*IMG.w/IMG.h;
+  const right=x1+bh*0.8<IMG.w; let cx=(x0+x1)/2+(right?1:-1)*bh*0.3, cy=(y0+y1)/2;
+  let x=Math.max(0,Math.min(IMG.w-W,cx-W/2)), y=Math.max(0,Math.min(IMG.h-H,cy-H/2));
+  return {vb:[x,y,W,H], right};
+}
+const heatColor=v=>{ const t=Math.max(0,Math.min(1,(v-0.4)/0.35)); return `hsla(${(42-30*t).toFixed(0)},92%,${(70-22*t).toFixed(0)}%,${(.35+.4*t).toFixed(2)})` };
+const soldShare=list=>list.filter(q=>q.status!=='free').length/list.length;
+const sum=list=>list.reduce((a,q)=>a+(q.price||0),0);
+
+function sceneComplex(){
+  const heat=MODE==='sales';
+  let s=`<image href="${IMG.src}" width="${IMG.w}" height="${IMG.h}"/><g class="${heat?'heat':''}">`;
+  BUILDINGS.forEach(b=>{
+    const fr=b.flats.filter(fits), mp=minOf(fr);
+    s+=`<polygon class="zone bld" data-z="bld" data-key="${b.id}" tabindex="0" role="button" aria-label="${b.name}: ${nFree(fr.length)}" points="${pts(b.g.p)}" style="--hf:${heatColor(soldShare(b.flats))}"/>`;
+    zones[b.id]={tip:()=>`<b>${b.name}</b> · ${b.floors} эт.<div>${fr.length?nFree(fr.length)+(mp?' · от '+eur(mp):''):'Нет свободных под фильтры'}</div><div class="h">${CUR.b===b.id?'Нажмите ещё раз, чтобы выбрать этаж':'Нажмите, чтобы выбрать корпус'}</div>`};
+  });
+  s+=`</g>`;
+  BUILDINGS.forEach(b=>{
+    const top=b.g.p.reduce((a,q)=>q[1]<a[1]?q:a), cx=(b.box[0]+b.box[2])/2, y=top[1]-16, n=b.flats.filter(fits).length, on=CUR.b===b.id;
+    const txt=heat? `${b.id} ${Math.round(soldShare(b.flats)*100)}%` : on? `${b.id} · ${n} свободно` : `${b.id} ${n}`, w=txt.length*12+24;
+    s+=`<g class="pin" data-pin="${b.id}"><rect x="${cx-w/2}" y="${y-30}" width="${w}" height="32" rx="16" fill="${on?'#f5b54a':'#fff'}" opacity=".95"/>
+      <text x="${cx}" y="${y-8}" text-anchor="middle" font-family="Manrope,sans-serif" font-size="20" font-weight="800" fill="#141a26">${txt}</text></g>`;
+  });
+  return s;
+}
+function sceneFacade(b){
+  const g=b.g, n=b.floors, {vb,right}=frameFor(b), k=vb[3]/700;
+  const line=i=>g.t.map((q,j)=>[q[0]+(g.b[j][0]-q[0])*i/n, q[1]+(g.b[j][1]-q[1])*i/n]);
+  const ext=30, extend=l=>{ const a=l[0],a2=l[1],z=l[l.length-1],z2=l[l.length-2];
+    const sa=(a2[1]-a[1])/((a2[0]-a[0])||1), sz=(z[1]-z2[1])/((z[0]-z2[0])||1);
+    return [[a[0]-ext,a[1]-sa*ext],...l,[z[0]+ext,z[1]+sz*ext]] };
+  const hole=`M0 0H${IMG.w}V${IMG.h}H0Z M${g.p.map(q=>q.join(' ')).join(' L')}Z`;
+  let s=`<image href="${IMG.src}" width="${IMG.w}" height="${IMG.h}"/><path d="${hole}" fill="rgba(6,10,20,.55)" fill-rule="evenodd"/>
+    <clipPath id="clipB"><polygon points="${pts(g.p)}"/></clipPath>
+    <polygon points="${pts(g.p)}" fill="none" stroke="#f5b54a" stroke-width="2" vector-effect="non-scaling-stroke"/>
+    <g id="bands" clip-path="url(#clipB)">`;
+  for(let f=1; f<=n; f++){ const i=n-f, top=extend(line(i)), bot=extend(line(i+1)).reverse();
+    const fl=b.flats.filter(q=>q.floor===f), fr=fl.filter(fits);
+    s+=`<polygon class="zone band" data-z="band" data-key="${f}" tabindex="0" role="button" aria-label="Этаж ${f}: ${nFree(fr.length)}" points="${pts(top.concat(bot))}"/>`;
+    zones['f'+f]={tip:()=>`<b>Этаж ${f}</b><div>${fr.length?nFree(fr.length)+' · от '+eur(minOf(fr)):'Нет свободных под фильтры'}</div><div class="h">Нажмите, чтобы открыть план этажа</div>`};
+  }
+  s+=`</g><g id="lbls">`;
+  const fs=19*k, lw=170*k, lh=32*k, gap=lh*1.15;
+  const endY=f=>{ const i=n-f, a=line(i), c=line(i+1), j=right?a.length-1:0; return (a[j][1]+c[j][1])/2 };
+  let ys=[]; for(let f=n; f>=1; f--){ let y=endY(f); if(ys.length) y=Math.max(y, ys[ys.length-1]+gap); ys.push(y) }
+  for(let f=1; f<=n; f++){ const fr=b.flats.filter(q=>q.floor===f&&fits(q)).length, ey=ys[n-f];
+    const lx=right? b.box[2]+16*k : b.box[0]-16*k-lw, ly=ey-lh/2;
+    s+=`<g class="flab" data-z="band" data-key="${f}"><rect x="${lx}" y="${ly}" width="${lw}" height="${lh}" rx="${lh/2}" fill="#fff" opacity=".95"/>
+      <text x="${lx+12*k}" y="${ly+lh*.7}" font-family="Manrope" font-size="${fs}" font-weight="800" fill="#141a26" pointer-events="none">${f} эт · ${fr?fr+' своб.':'нет'}</text></g>`;
+  }
+  return {svg:s+`</g>`, vb};
+}
+// План этажа: изображение и контуры в одной системе координат, масштабируются вместе
+function floorBody(b,f,opt={}){
+  const flats=b.flats.filter(q=>q.floor===f), sel=opt.sel;
+  if(b.id==='L'){
+    let s=`<image href="${L_IMG.src}" width="${L_IMG.w}" height="${L_IMG.h}"/>`;
+    flats.forEach(q=>{
+      const label=`Квартира ${q.num}, ${STATUS[q.status].toLowerCase()}, ${q.type}, ${q.area} м²${q.status!=='sold'?', '+eur(q.price):''}`;
+      s+= opt.static? `<polygon class="flat ${q.status}" points="${pts(KP[q.n])}" style="pointer-events:none"/>`
+        : `<polygon class="zone flat ${q.status}" data-z="flat" data-key="${q.num}" tabindex="0" role="button" aria-label="${label}" points="${pts(KP[q.n])}"/>`;
+      const [x,y]=BADGE[q.n], t=STATUS[q.status], w=t.length*13+26;
+      s+=`<g pointer-events="none"><rect x="${x-w/2}" y="${y+28}" width="${w}" height="34" rx="17" fill="${{free:'#1e8f57',booked:'#b8932c',sold:'#6f7786'}[q.status]}"/>
+        <text x="${x}" y="${y+51}" text-anchor="middle" font-family="Manrope,sans-serif" font-size="20" font-weight="800" fill="#fff">${t}</text></g>`;
+    });
+    if(sel){ const q=FLAT[sel]; if(q&&q.b==='L') s+=`<g id="ring"><polygon class="ring-o" points="${pts(KP[q.n])}"/><polygon class="ring-i" points="${pts(KP[q.n])}"/></g>` }
+    return {svg:s, vb:[-20,-20,L_IMG.w+40,L_IMG.h+40], wide:false};
+  }
+  // схема для корпусов без поэтажных планов
+  let s=`<rect x="140" y="100" width="920" height="520" fill="#f6f4ef"/><text x="600" y="128" text-anchor="middle" font-family="Manrope" font-size="15" fill="#6b7686">Схема для демо: поэтажного плана этого корпуса пока нет</text>
+    <rect x="160" y="340" width="880" height="40" fill="#e3e0da"/><rect x="440" y="380" width="120" height="200" fill="#d5d1ca"/>
+    <text x="500" y="485" text-anchor="middle" font-family="Manrope" font-size="14" fill="#4b5566">лифт · лестница</text>`;
+  flats.forEach(q=>{ const [x,y,w,h]=PLAN[q.n];
+    s+= opt.static? `<rect class="flat ${q.status}" x="${x}" y="${y}" width="${w}" height="${h}" style="stroke:#2b3443;stroke-width:3"/>`
+      : `<rect class="zone flat ${q.status}" data-z="flat" data-key="${q.num}" tabindex="0" role="button" aria-label="Квартира ${q.num}, ${STATUS[q.status].toLowerCase()}, ${q.type}, ${q.area} м²" x="${x}" y="${y}" width="${w}" height="${h}" style="stroke:#2b3443;stroke-width:3"/>`;
+    s+=`<g pointer-events="none" font-family="Manrope" fill="#1d2533"><text x="${x+18}" y="${y+34}" font-size="22" font-weight="800">${q.num}</text>
+      <text x="${x+18}" y="${y+60}" font-size="16">${q.type} · ${q.area} м²</text><text x="${x+18}" y="${y+h-18}" font-size="16" font-weight="800">${STATUS[q.status]}</text></g>`;
+  });
+  if(sel){ const q=FLAT[sel]; if(q){ const [x,y,w,h]=PLAN[q.n]; s+=`<g id="ring"><rect class="ring-o" x="${x}" y="${y}" width="${w}" height="${h}"/><rect class="ring-i" x="${x}" y="${y}" width="${w}" height="${h}"/></g>` } }
+  return {svg:s, vb:[140,100,920,520], wide:true};
+}
+function sceneFloor(b,f){
+  const r=floorBody(b,f,{sel:CUR.sel});
+  b.flats.filter(q=>q.floor===f).forEach(q=>{
+    zones[q.num]={tip:()=>`<b>${q.num}</b> <span class="pill ${q.status}">${STATUS[q.status]}</span><div>${q.type} · ${q.area} м²${q.status!=='sold'?' · '+eur(q.price):''}</div><div class="h">Нажмите, чтобы выбрать</div>`};
+  });
+  return r;
+}
+
+function sceneSig(){ return [CUR.level, CUR.b||'', CUR.f||'', MODE, F.type, F.min, F.max, CUR.level==='complex'?CUR.b:''].join('|') }
+async function mountScene(prev, fromPage){
+  const sig=sceneSig(), key='v:'+CUR.level+'|'+(CUR.level==='complex'?'':CUR.b)+'|'+(CUR.f||'');
+  if(sig===mountedSig){ updateSel(); return }
+  const focusedKey=document.activeElement?.dataset?.key;
+  zones={}; hideTip(); mountedSig=sig;
+  const b=CUR.b&&BY[CUR.b];
+  let body, base, cls='render';
+  if(CUR.level==='floor'){ const r=sceneFloor(b,CUR.f); body=r.svg; base=r.vb; cls='plan'+(r.wide?' wide':'') }
+  else if(CUR.level==='facade'){ const r=sceneFacade(b); body=r.svg; base=r.vb }
+  else { body=sceneComplex(); base=FULL }
+  const keepFs=stageEl.classList.contains('fs');
+  stageEl.className='stage '+cls+(keepFs?' fs':'');
+  host.innerHTML=`<svg id="scene" viewBox="${base.join(' ')}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="${CUR.level==='floor'?'План этажа':CUR.level==='facade'?'Фасад корпуса':'Рендер комплекса'}">${body}</svg>`;
+  svgEl=host.firstChild; bindZones(svgEl);
+  // анимация «камеры» между комплексом и фасадом
+  const prevLvl=prev&&!fromPage?prev.level:null;
+  if(!reduced && prevLvl==='complex' && CUR.level==='facade'){
+    const from=VB['v:complex||']||FULL; svgEl.setAttribute('viewBox',from.join(' '));
+    const bands=svgEl.querySelector('#bands'), lbls=svgEl.querySelector('#lbls'); bands.style.opacity=0; lbls.style.opacity=0;
+    await animVB(svgEl, from, base, 650); bands.style.transition=lbls.style.transition='opacity .3s'; bands.style.opacity=1; lbls.style.opacity=1;
+  } else if(!reduced && prevLvl==='facade' && CUR.level==='complex' && prev.b){
+    const from=frameFor(BY[prev.b]).vb; await animVB(svgEl, from, VB['v:complex||']||FULL, 550);
+  } else if(!fromPage && prevLvl && prevLvl!==CUR.level){
+    svgEl.style.opacity=0; requestAnimationFrame(()=>requestAnimationFrame(()=>svgEl.style.opacity=1));
+  }
+  if(sceneSig()!==sig) return;        // пока шла анимация, выбор сменился
+  viewer=makeViewer(stageEl, svgEl, base, key);
+  updateSel();
+  if(focusedKey){ const el=svgEl.querySelector(`[data-z][data-key="${focusedKey}"]`); el&&el.focus({preventScroll:true}) }
+  if(MK) mkStop();
+}
+function updateSel(){
+  if(!svgEl) return;
+  svgEl.querySelectorAll('.bld').forEach(p=>p.classList.toggle('sel', p.dataset.key===CUR.b));
+  if(CUR.level==='floor'){
+    const old=svgEl.querySelector('#ring'); old&&old.remove();
+    const q=CUR.sel&&FLAT[CUR.sel];
+    if(q){ const el=svgEl.querySelector(`[data-z="flat"][data-key="${q.num}"]`);
+      if(el){ const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.id='ring';
+        const mk=c=>{ const n=el.cloneNode(); n.removeAttribute('tabindex'); n.removeAttribute('role'); n.removeAttribute('aria-label'); n.removeAttribute('data-z'); n.removeAttribute('data-key'); n.removeAttribute('style'); n.setAttribute('class',c); return n };
+        g.append(mk('ring-o'),mk('ring-i')); svgEl.appendChild(g) } }
+    svgEl.querySelectorAll('[data-z="flat"]').forEach(p=>p.setAttribute('aria-pressed', p.dataset.key===CUR.sel));
+  }
+  // информация о выбранной квартире в полноэкранном режиме
+  const q=CUR.level==='floor'&&CUR.sel&&FLAT[CUR.sel], fi=$('#fsinfo');
+  fi.classList.toggle('on',!!q);
+  fi.innerHTML=q?`<span><b>${q.num}</b> · ${STATUS[q.status]} · ${q.status==='sold'?'':eur(q.price)}</span><button class="btn primary" style="min-height:40px" id="fsMore">Подробнее</button>`:'';
+  if(q) $('#fsMore').onclick=()=>{ fsToggle(stageEl,false); go({page:q.num}) };
+}
+
+/* наведение, касание, клавиатура */
+function bindZones(svg){
+  svg.querySelectorAll('[data-z]').forEach(el=>{
+    const kind=el.dataset.z, key=el.dataset.key, zk=kind==='band'?'f'+key:key;
+    el.addEventListener('pointerenter',e=>{ if(e.pointerType!=='mouse'||viewer?.dragging) return; hov(el,true); showTip(zk,el) });
+    el.addEventListener('pointerleave',e=>{ if(e.pointerType!=='mouse') return; hov(el,false); hideTip() });
+    el.addEventListener('focus',()=>{ hov(el,true); showTip(zk,el) });
+    el.addEventListener('blur',()=>{ hov(el,false); hideTip() });
+    el.addEventListener('click',()=>activate(kind,key));
+    el.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); activate(kind,key) } });
+  });
+}
+function hov(el,on){ const k=el.dataset.key, z=el.dataset.z; svgEl&&svgEl.querySelectorAll(`[data-z="${z}"][data-key="${k}"]`).forEach(x=>x.classList.toggle('hov',on)) }
+function activate(kind,key){
+  if(MK) return;
+  hideTip();
+  if(kind==='bld'){ if(CUR.b===key && CUR.level==='complex') go({b:key,level:'facade'}); else go({b:key},{replace:CUR.level==='complex'&&!!CUR.b}) }
+  else if(kind==='band') go({b:CUR.b,f:+key,level:'floor'});
+  else if(kind==='flat') go({b:CUR.b,f:CUR.f,level:'floor',sel:key},{replace:true});
+}
+function showTip(zk,el){
+  const z=zones[zk]; if(!z) return;
+  tip.innerHTML=z.tip(); tip.classList.add('show');
+  // рядом с объектом, а не поверх него
+  const W=stageEl.clientWidth,H=stageEl.clientHeight,cw=tip.offsetWidth,ch=tip.offsetHeight, w=stageEl.getBoundingClientRect(), r=el.getBoundingClientRect();
+  const L=r.left-w.left,T=r.top-w.top,Rr=r.right-w.left,B=r.bottom-w.top;
+  let l, t=Math.max(8,Math.min(H-ch-8,(T+B)/2-ch/2));
+  if(Rr+10+cw<=W-8) l=Rr+10; else if(L-10-cw>=8) l=L-10-cw;
+  else { l=Math.max(8,Math.min(W-cw-8,(L+Rr)/2-cw/2)); t=T-ch-10>=8?T-ch-10:Math.min(H-ch-8,B+10) }
+  tip.style.left=l+'px'; tip.style.top=t+'px';
+}
+function hideTip(){ tip.classList.remove('show') }
+$('#ctrls').addEventListener('click',e=>{ const c=e.target.closest('[data-c]')?.dataset.c; if(!c||!viewer) return;
+  if(c==='in') viewer.zoom(1.4); if(c==='out') viewer.zoom(1/1.4); if(c==='fit') viewer.fit(); if(c==='fs') fsToggle(stageEl) });
+
+/* ===================== Карточка справа ===================== */
+const side=$('#side');
+function typeRows(b){
+  const types=['1+1','2+1','3+1'].filter(t=>b.flats.some(q=>q.type===t));
+  return `<div class="rows">${types.map(t=>{ const n=b.flats.filter(q=>q.status==='free'&&q.type===t&&okBudget(q)).length;
+    return `<button class="row" data-type="${t}" aria-pressed="${F.type===t}" title="Показать только ${t}"><b>${t}</b><span>${nFlats(n)}</span><span class="chev">›</span></button>` }).join('')}</div>`;
+}
+function salesBox(b){
+  const c=st=>b.flats.filter(q=>q.status===st);
+  return `<div class="salesbox"><b>Продажи корпуса</b><dl class="kv"><dt>Продано</dt><dd>${c('sold').length} из ${b.flats.length}</dd><dt>В брони</dt><dd>${c('booked').length}</dd>
+    <dt>Продано на</dt><dd>${meur(sum(c('sold')))}</dd><dt>Остаток</dt><dd>${meur(sum(c('free')))}</dd></dl>
+    <div class="minibar"><i style="flex:${c('sold').length};background:var(--sold)"></i><i style="flex:${c('booked').length};background:var(--booked)"></i><i style="flex:${c('free').length};background:var(--free)"></i></div></div>`;
+}
+function noMatch(scope){
+  return `<div class="stack"><p class="muted">Под текущие фильтры ${scope} свободных квартир нет.</p>
+    ${activeFilters()?'<button class="btn" data-act="reset">Сбросить бюджет и планировку</button>':''}</div>`;
+}
+function renderSide(){
+  const b=CUR.b&&BY[CUR.b]; let h='';
+  if(!b){
+    h=`<h2>Комплекс</h2><p class="muted">Нажмите на корпус на рендере или выберите здесь. Цифра — свободные квартиры под фильтры.</p>
+      <div class="bgrid">${BUILDINGS.map(x=>`<button data-b="${x.id}" aria-label="${x.name}: ${nFree(x.flats.filter(fits).length)}"><b>${x.id}</b><span>${x.flats.filter(fits).length}</span></button>`).join('')}</div>`;
+  } else if(CUR.level==='complex'){
+    const fr=b.flats.filter(fits), mp=minOf(fr);
+    h=`<div><h2>${b.name}</h2><p class="muted">${b.floors} ${plural(b.floors,'этаж','этажа','этажей')}</p></div>
+      ${fr.length?`<p class="hl">${nFree(fr.length)}</p><div class="big">от ${eur(mp)}</div>`:noMatch('в этом корпусе')}
+      ${typeRows(b)}
+      <div class="stack"><button class="btn primary block" data-act="floors">Выбрать этаж →</button><button class="btn block" data-act="list">▦ Квартиры корпуса</button></div>
+      ${MODE==='sales'?salesBox(b):''}`;
+  } else if(CUR.level==='facade'){
+    h=`<div><h2>${b.name}</h2><p class="muted">Выберите этаж на фасаде или в списке</p></div>
+      <div class="rows">${Array.from({length:b.floors},(_,i)=>b.floors-i).map(f=>{ const fr=b.flats.filter(q=>q.floor===f&&fits(q));
+        return `<button class="row" data-f="${f}"><b>${f} этаж</b><span>${fr.length?nFree(fr.length)+' · от '+eur(minOf(fr)):'нет свободных'}</span><span class="chev">›</span></button>` }).join('')}</div>
+      ${MODE==='sales'?`<button class="btn" id="mkBtn">✎ Разметить этажи</button>`:''}`;
+  } else {
+    const q=CUR.sel&&FLAT[CUR.sel];
+    if(!q){
+      const fl=b.flats.filter(x=>x.floor===CUR.f), c=st=>fl.filter(x=>x.status===st).length;
+      h=`<div><h2>Этаж ${CUR.f}</h2><p class="muted">${b.name} · ${nFlats(fl.length)}</p></div>
+        <dl class="kv">${['free','booked','sold'].map(st=>`<dt><i class="dot" style="background:var(--${st})"></i> ${STATUS[st]}</dt><dd>${c(st)}</dd>`).join('')}</dl>
+        <p class="muted">Нажмите на квартиру на плане, чтобы посмотреть её здесь.</p>`;
+    } else h=quickCard(q);
+  }
+  side.innerHTML=h;
+  side.querySelectorAll('[data-b]').forEach(x=>x.onclick=()=>go({b:x.dataset.b}));
+  side.querySelectorAll('[data-type]').forEach(x=>x.onclick=()=>setFilters({type:F.type===x.dataset.type?'all':x.dataset.type}));
+  side.querySelectorAll('[data-f]').forEach(x=>x.onclick=()=>go({b:CUR.b,f:+x.dataset.f,level:'floor'}));
+  side.querySelector('[data-act="floors"]')?.addEventListener('click',()=>go({b:CUR.b,level:'facade'}));
+  side.querySelector('[data-act="list"]')?.addEventListener('click',()=>$('#list').scrollIntoView({behavior:reduced?'auto':'smooth'}));
+  side.querySelector('[data-act="reset"]')?.addEventListener('click',()=>setFilters({min:null,max:null,type:'all'}));
+  side.querySelector('[data-act="more"]')?.addEventListener('click',e=>go({page:e.currentTarget.dataset.num}));
+  side.querySelector('[data-act="similar"]')?.addEventListener('click',e=>{ go({page:e.currentTarget.dataset.num}); setTimeout(()=>$('#similar')?.scrollIntoView(),50) });
+  side.querySelector('#mkBtn')?.addEventListener('click',mkStart);
+  syncSl();
+}
+function thumbOf(q){ return q.img? `<img src="${q.img}" alt="Планировка ${q.num}" loading="lazy">` : schemeSvg(q) }
+function quickCard(q){
+  const sold=q.status==='sold';
+  return `<div><h2>Квартира ${q.num}</h2><div style="margin-top:8px"><span class="pill ${q.status}">${STATUS[q.status]}</span></div></div>
+    <div class="big">${sold?'Продана':eur(q.price)}</div>
+    <p style="margin:0;font-size:17px">${q.type} · ${q.area} м² · ${q.floor} этаж</p>
+    <div class="thumb">${thumbOf(q)}</div>
+    ${q.status==='booked'?'<p class="note">Квартира в брони. Менеджер подскажет, если она освободится.</p>':''}
+    <div class="stack"><button class="btn primary block" data-act="more" data-num="${q.num}">Подробнее о квартире →</button>
+    ${sold?`<button class="btn block" data-act="similar" data-num="${q.num}">Похожие свободные</button>`:`<button class="btn block sl-btn" data-num="${q.num}"></button>`}</div>`;
+}
+
+/* Схематичная планировка для корпусов без настоящих планов */
+const LAYOUTS={
+ '1+1':[['bal',0,40,36,100],['bed',36,0,110,66],['bath',146,0,54,66],['liv',36,66,164,74]],
+ '2+1':[['bal',0,40,36,100],['bed',36,0,74,66],['bath',110,0,44,66],['bed',154,0,46,140],['liv',36,66,118,74]],
+ '3+1':[['bal',0,40,36,100],['bed',36,0,64,66],['bath',100,0,36,33],['bath',100,33,36,33],['bed',136,0,64,66],['liv',36,66,104,74],['bed',140,66,60,74]]};
+function schemeSvg(q){
+  let s=`<svg class="fp" viewBox="-8 -8 216 156" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Схема планировки ${q.type}">`;
+  LAYOUTS[q.type].forEach(([k,x,y,w,h])=>{ const fill=k==='bath'?'#e3e8ec':k==='bal'?'#ece8e1':'#d8b384';
+    s+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}" stroke="#3b3b3b" stroke-width="${k==='bal'?1:2.2}"/>`;
+    if(k==='bed'){ const cx=x+w/2, cy=y+h/2, bw=Math.min(w*.6,40), bh=Math.min(h*.55,34); s+=`<rect x="${cx-bw/2}" y="${cy-bh/2}" width="${bw}" height="${bh}" rx="2" fill="#f4f1ea" stroke="#9aa3ad" stroke-width=".6"/><rect x="${cx-bw/2}" y="${cy-bh/2+bh*.45}" width="${bw}" height="${bh*.55}" fill="#5d6f8f" opacity=".75"/>` } });
+  return s+`<text x="100" y="152" text-anchor="middle" font-family="Manrope" font-size="8" fill="#6b7686">схема для демо</text></svg>`;
+}
+
+/* ===================== Список квартир ===================== */
+let shown=12, listSig='';
+function listScope(){ const b=CUR.b; return ALL().filter(q=>fits(q) && (!b||q.b===b) && (!CUR.f||q.floor===CUR.f)) }
+function renderList(){
+  const sig=[CUR.b,CUR.f,F.type,F.min,F.max].join('|'); if(sig!==listSig){ shown=12; listSig=sig }
+  const list=listScope(), k=F.sort.replace('-',''), dir=F.sort[0]==='-'?-1:1;
+  list.sort((a,b)=>((a[k]??Infinity)-(b[k]??Infinity))*dir || a.num.localeCompare(b.num));
+  $('#listTitle').textContent=['Свободные квартиры', CUR.b&&'Корпус '+CUR.b, CUR.f&&'Этаж '+CUR.f].filter(Boolean).join(' · ');
+  $('#count').textContent=`${list.length} ${plural(list.length,'вариант','варианта','вариантов')}`;
+  const chips=[];
+  if(CUR.b) chips.push(`<button class="chip" data-rm="b" aria-label="Убрать фильтр: корпус ${CUR.b}">Корпус ${CUR.b}<i>×</i></button>`);
+  if(CUR.f) chips.push(`<button class="chip" data-rm="f" aria-label="Убрать фильтр: этаж ${CUR.f}">Этаж ${CUR.f}<i>×</i></button>`);
+  if(F.type!=='all') chips.push(`<button class="chip" data-rm="t" aria-label="Убрать фильтр: ${F.type}">${F.type}<i>×</i></button>`);
+  if(F.min!=null||F.max!=null) chips.push(`<button class="chip" data-rm="p" aria-label="Убрать фильтр бюджета">${F.min!=null?'от '+eur(F.min):''}${F.min!=null&&F.max!=null?' ':''}${F.max!=null?'до '+eur(F.max):''}<i>×</i></button>`);
+  $('#ctxChips').innerHTML=chips.join('');
+  $('#ctxChips').querySelectorAll('[data-rm]').forEach(c=>c.onclick=()=>{ const r=c.dataset.rm;
+    if(r==='b') go({}); else if(r==='f') go({b:CUR.b,level:'facade'}); else if(r==='t') setFilters({type:'all'}); else setFilters({min:null,max:null}) });
+  const g=$('#grid');
+  if(!list.length){
+    const btns=[];
+    if(F.min!=null||F.max!=null) btns.push(`<button class="btn" data-x="p">Сбросить бюджет</button>`);
+    if(F.type!=='all') btns.push(`<button class="btn" data-x="t">Любая планировка</button>`);
+    if(CUR.f) btns.push(`<button class="btn" data-x="f">Все этажи корпуса ${CUR.b}</button>`);
+    if(CUR.b) btns.push(`<button class="btn" data-x="b">Все корпуса</button>`);
+    g.innerHTML=`<div class="empty"><p><b>Свободных квартир под эти условия нет.</b></p><p class="muted" style="color:var(--muted)">${CUR.f?'На плане выше видны все квартиры этажа, включая бронь и проданные. ':''}Попробуйте снять одно из ограничений:</p><div class="ctx">${btns.join('')}</div></div>`;
+    g.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{ const x=b.dataset.x; if(x==='p') setFilters({min:null,max:null}); if(x==='t') setFilters({type:'all'}); if(x==='f') go({b:CUR.b,level:'facade'}); if(x==='b') go({}) });
+    $('#more').hidden=true; return;
+  }
+  g.innerHTML=list.slice(0,shown).map(cardHtml).join('');
+  bindCards(g);
+  $('#more').hidden=list.length<=shown;
+}
+function cardHtml(q){
+  return `<article class="fcard" data-num="${q.num}">
+    <div class="tw"><div class="thumb">${thumbOf(q)}</div><button class="btn heart sl-btn" data-num="${q.num}" data-icon="1"></button></div>
+    <div class="stack" style="gap:6px;min-width:0">
+      <div class="t"><span class="num">${q.num}</span><span class="pill ${q.status}">${STATUS[q.status]}</span></div>
+      <div class="meta">${q.type} · ${q.area} м² · ${q.floor} этаж${CUR.b===q.b?'':' · корпус '+q.b}</div>
+      <div class="pr">${q.status==='sold'?'Продана':eur(q.price)}</div>
+      <div class="acts"><button class="btn" data-go="page">Подробнее</button><button class="btn" data-go="plan">На плане</button></div>
+    </div></article>`;
+}
+function bindCards(root){
+  root.querySelectorAll('.fcard').forEach(c=>{ const q=FLAT[c.dataset.num];
+    c.querySelector('[data-go="page"]').onclick=()=>go({page:q.num});
+    c.querySelector('[data-go="plan"]').onclick=()=>{ go({b:q.b,f:q.floor,level:'floor',sel:q.num}); stageEl.scrollIntoView({behavior:reduced?'auto':'smooth',block:'center'}) };
+  });
+  syncSl();
+}
+$('#more').onclick=()=>{ shown+=12; renderList() };
+
+/* ===================== Экраны 1–2 целиком ===================== */
+function renderPicker(prev, fromPage){
+  renderTop();
+  mountScene(prev, fromPage);
+  renderSide(); renderList();
+  const sales=MODE==='sales'&&CUR.level==='complex';
+  $('#legend').hidden=sales; $('#heatLegend').hidden=!sales;
+  $('#hint').textContent = CUR.level==='complex'? 'Наведите на корпус, чтобы увидеть подсказку. Нажмите, чтобы выбрать.' : CUR.level==='facade'? 'Нажмите на этаж, чтобы открыть его план.' : 'Кнопки + и − меняют масштаб, увеличенный план можно двигать. «Вписать» показывает этаж целиком.';
+  const fsw=$('#floorsw'), b=CUR.b&&BY[CUR.b];
+  fsw.innerHTML = CUR.level==='floor'? `<span>Этаж:</span>`+Array.from({length:b.floors},(_,i)=>i+1).map(f=>`<button data-f="${f}" aria-current="${f===CUR.f}" aria-label="Этаж ${f}">${f}</button>`).join('') : '';
+  fsw.querySelectorAll('[data-f]').forEach(x=>x.onclick=()=>go({b:CUR.b,f:+x.dataset.f,level:'floor'}));
+  mkExport();
+}
+
+/* ===================== Экран 3: страница квартиры ===================== */
+let pageTab='plan', galViewer=null;
+function describe(q){
+  const head={'1+1':'Спальня, гостиная с кухней, санузел','2+1':'Две спальни, гостиная с кухней, санузел','3+1':'Три спальни, гостиная с кухней, два санузла'}[q.type];
+  return `${head} и ${q.outdoor}. Подробности отделки и комплектации уточняются.`;
+}
+function similar(q){
+  return ALL().filter(x=>x.status==='free' && x.num!==q.num && x.type===q.type)
+    .sort((a,b)=>(a.b===q.b?0:1)-(b.b===q.b?0:1) || Math.abs(a.area-q.area)-Math.abs(b.area-q.area) || Math.abs(a.price-q.price)-Math.abs(b.price-q.price)).slice(0,3);
+}
+function backTarget(q){
+  if(LASTPICK && !LASTPICK.page){ const L=LASTPICK;
+    const label=L.level==='floor'?`К этажу ${L.f} корпуса ${L.b}`:L.level==='facade'?`К выбору этажа корпуса ${L.b}`:L.b?`К корпусу ${L.b}`:'К комплексу';
+    return {st:{level:L.level,b:L.b,f:L.f,sel:L.sel}, label} }
+  return {st:{level:'floor',b:q.b,f:q.floor,sel:q.num}, label:`К этажу ${q.floor} корпуса ${q.b}`};
+}
+function showPage(prev){
+  const q=FLAT[CUR.page], b=BY[q.b], sold=q.status==='sold', bk=backTarget(q), sim=similar(q);
+  renderTop();
+  $('#picker').hidden=true; const P=$('#fpage'); P.hidden=false; hideTip(); fsToggle(stageEl,false);
+  const tabs=[['plan','Планировка'],['floor','На этаже']].concat(q.photos.length?[['photo','Фото']]:[]);
+  if(!tabs.some(t=>t[0]===pageTab)) pageTab='plan';
+  P.innerHTML=`
+    <button class="btn link back" data-back>← ${bk.label}</button>
+    <div class="fhead"><h1>Квартира ${q.num}</h1><span class="pill ${q.status}">${STATUS[q.status]}</span></div>
+    <p class="params">${q.type}<span>·</span>Корпус ${q.b}<span>·</span>Этаж ${q.floor}<span>·</span>${q.area} м²</p>
+    ${sold?`<div class="banner sold">Эта квартира уже продана. Ниже подобраны похожие свободные варианты. Ваши фильтры каталога не изменены.</div>`:''}
+    ${q.status==='booked'?`<div class="banner">Квартира в брони. Можно добавить её в подборку: менеджер сообщит, если она освободится.</div>`:''}
+    <div class="tabs" role="tablist" aria-label="Галерея">${tabs.map(([k,t])=>`<button role="tab" data-tab="${k}" aria-selected="${k===pageTab}">${t}</button>`).join('')}</div>
+    <div class="fgrid">
+      <div class="gal" id="gal" role="tabpanel"></div>
+      <aside class="buy">
+        <div class="big">${sold?'Продана':eur(q.price)}</div>
+        <dl class="kv"><dt>Общая площадь</dt><dd>${q.area} м²</dd><dt>Этаж</dt><dd>${q.floor} из ${b.floors}</dd><dt>Вид из окон</dt><dd>Уточняется</dd><dt>Айдат</dt><dd>Уточняется</dd></dl>
+        <p class="note">Цена и наличие из тестовых данных. Актуальность подтвердит менеджер.</p>
+        ${sold?`<button class="btn primary block" data-act="sim">Смотреть похожие свободные ↓</button>`
+              :`<button class="btn primary block" data-act="ask">Уточнить наличие и условия</button><button class="btn block sl-btn" data-num="${q.num}"></button>`}
+        <button class="btn block" data-act="share">⇪ Поделиться</button>
+      </aside>
+    </div>
+    <section class="card2"><h2>О квартире</h2><p>${describe(q)}</p></section>
+    <div class="two">
+      <section class="card2"><h2>Характеристики</h2><div class="chars">
+        <div><i>▦</i><span>Планировка</span><b>${q.type}</b></div>
+        <div><i>⌂</i><span>Санузлы</span><b>${q.baths}</b></div>
+        <div><i>◫</i><span>Площадь нетто</span><b>Уточняется</b></div>
+        <div><i>✦</i><span>Отделка</span><b>Уточняется</b></div></div></section>
+      <section class="card2"><h2>Расположение на этаже</h2>
+        <button class="miniplan" data-act="mini" aria-label="Открыть план этажа ${q.floor} крупно">${miniFloor(q)}</button>
+        <p class="note">Выделена квартира ${q.num}. Нажмите, чтобы увеличить.</p></section>
+    </div>
+    <section class="card2"><h2>Условия покупки</h2><div class="terms">
+      <div class="term"><i>◎</i><b>Условия оплаты</b><span>Уточнить у менеджера</span></div>
+      <div class="term"><i>▤</i><b>Дополнительные расходы</b><span>По расчёту</span></div>
+      <div class="term"><i>✓</i><b>Документы</b><span>По запросу</span></div></div></section>
+    <section class="card2" id="similar"><h2>${sold?'Похожие свободные квартиры':'Похожие квартиры'}</h2>
+      ${sold?'<p class="note">Та же планировка и близкая площадь. Это подсказка, а не результат ваших фильтров.</p>':''}
+      ${sim.length?`<div class="grid">${sim.map(cardHtml).join('')}</div>`:'<p class="muted">Похожих свободных квартир сейчас нет.</p>'}</section>
+    <button class="btn back" data-back>← Вернуться к выбору квартиры</button>`;
+  renderGal(q);
+  P.querySelectorAll('[data-back]').forEach(x=>x.onclick=()=>go(bk.st));
+  P.querySelectorAll('[data-tab]').forEach(x=>x.onclick=()=>{ pageTab=x.dataset.tab; P.querySelectorAll('[data-tab]').forEach(y=>y.setAttribute('aria-selected',y===x)); renderGal(q) });
+  P.querySelector('[data-act="ask"]')?.addEventListener('click',()=>openForm([q.num]));
+  P.querySelector('[data-act="sim"]')?.addEventListener('click',()=>$('#similar').scrollIntoView({behavior:reduced?'auto':'smooth'}));
+  P.querySelector('[data-act="share"]').onclick=()=>share(q);
+  P.querySelector('[data-act="mini"]').onclick=()=>{ pageTab='floor'; P.querySelectorAll('[data-tab]').forEach(y=>y.setAttribute('aria-selected',y.dataset.tab==='floor')); renderGal(q); fsToggle($('#gal'),true) };
+  bindCards(P.querySelector('#similar'));
+  stickyBuy(sold?null:q);
+  scrollTo(0,0);
+  syncSl();
+}
+function miniFloor(q){
+  const r=floorBody(BY[q.b], q.floor, {static:true, sel:q.num});
+  return `<svg viewBox="${r.vb.join(' ')}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${r.svg}</svg>`;
+}
+function renderGal(q){
+  const g=$('#gal'), wasFs=g.classList.contains('fs');
+  const ctl=`<div class="ctrls">${pageTab==='floor'?'<button class="ctrl" data-c="out" aria-label="Уменьшить">−</button><button class="ctrl" data-c="in" aria-label="Увеличить">+</button><button class="ctrl txt" data-c="fit" aria-label="Вписать целиком">Вписать</button>':''}<button class="ctrl" data-c="fs" aria-label="${wasFs?'Выйти из полноэкранного режима':'Во весь экран'}">${wasFs?'✕':'⛶'}</button></div>`;
+  if(pageTab==='plan'){
+    g.innerHTML=(q.img?`<img src="${q.img}" alt="Планировка квартиры ${q.num}">`:schemeSvg(q))+`<span class="cap">${q.img?'Иллюстрация планировки для демо':'Схема для демо'}</span>`+ctl;
+    galViewer=null;
+  } else {
+    const r=floorBody(BY[q.b], q.floor, {static:true, sel:q.num});
+    g.innerHTML=`<div class="stage plan" style="background:#fff"><svg viewBox="${r.vb.join(' ')}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="План этажа ${q.floor}, выделена квартира ${q.num}">${r.svg}</svg></div><span class="cap">Этаж ${q.floor} · выделена ${q.num}</span>`+ctl;
+    const st=g.querySelector('.stage'); galViewer=makeViewer(st, st.querySelector('svg'), r.vb, 'gal:'+q.num);
+  }
+  g.querySelector('.ctrls').onclick=e=>{ const c=e.target.closest('[data-c]')?.dataset.c; if(!c) return;
+    if(c==='fs'){ fsToggle(g); renderGal(q); return }
+    if(!galViewer) return; if(c==='in') galViewer.zoom(1.4); if(c==='out') galViewer.zoom(1/1.4); if(c==='fit') galViewer.fit() };
+}
+function stickyBuy(q){
+  const s=$('#stickybuy'); s.hidden=!q; document.body.classList.toggle('has-sticky',!!q);
+  if(q){ s.innerHTML=`<div style="min-width:0"><b>${q.num}</b><div class="note">${eur(q.price)}</div></div><button class="btn primary">Уточнить наличие и условия</button>`; s.querySelector('button').onclick=()=>openForm([q.num]) }
+}
+const linkOf = num => location.href.split('#')[0]+'#/flat/'+num;
+async function share(q){
+  const url=linkOf(q.num), text=`Квартира ${q.num}: ${q.type}, ${q.area} м², ${q.floor} этаж`;
+  try{ if(navigator.share){ await navigator.share({title:text,text,url}); return } }catch(e){ if(e.name==='AbortError') return }
+  try{ await navigator.clipboard.writeText(url); toast('Ссылка на квартиру скопирована') }
+  catch(e){ openInfo('Ссылка на квартиру', `<p>Скопируйте ссылку вручную:</p><div class="msg">${esc(url)}</div>`) }
+}
+
+/* ===================== Подборка (без регистрации, хранится в этом браузере) ===================== */
+const SL_KEY='ap.shortlist.v1';
+let SL=[]; try{ SL=JSON.parse(localStorage.getItem(SL_KEY)||'[]')||[] }catch(e){ SL=[] }
+// при повторном открытии сверяем с текущими данными
+const SL_NOTES={};
+SL.forEach(it=>{ const q=FLAT[it.num];
+  if(!q) SL_NOTES[it.num]='Квартиры больше нет в продаже';
+  else if(q.status!==it.status) SL_NOTES[it.num]=`Статус изменился: было «${STATUS[it.status]}», сейчас «${STATUS[q.status]}»`;
+  else if(q.price!==it.price) SL_NOTES[it.num]=`Цена изменилась: было ${eur(it.price)}, сейчас ${eur(q.price)}`; });
+const slSave=()=>{ try{ localStorage.setItem(SL_KEY, JSON.stringify(SL)) }catch(e){} };
+const slHas=num=>SL.some(x=>x.num===num);
+function slToggle(num){
+  if(slHas(num)){ SL=SL.filter(x=>x.num!==num); toast(`${num} убрана из подборки`) }
+  else { const q=FLAT[num]; SL.push({num, status:q.status, price:q.price, t:Date.now()}); toast(`${num} в подборке. Это не бронь`) }
+  delete SL_NOTES[num]; slSave(); syncSl();
+}
+function syncSl(){
+  $('#slCount').textContent=SL.length||'';
+  document.querySelectorAll('.sl-btn').forEach(b=>{ const on=slHas(b.dataset.num); b.setAttribute('aria-pressed',on);
+    if(b.dataset.icon){ b.textContent=on?'♥':'♡'; b.setAttribute('aria-label',on?`Убрать ${b.dataset.num} из подборки`:`Добавить ${b.dataset.num} в подборку`) }
+    else b.textContent=on?'♥ В подборке':'♡ В подборку';
+    b.onclick=e=>{ e.stopPropagation(); slToggle(b.dataset.num) } });
+}
+const modal=$('#modal'); let lastFocus=null;
+function openModal(html){ lastFocus=document.activeElement; modal.innerHTML=html; modal.hidden=false;
+  modal.querySelector('.x')?.addEventListener('click',closeModal); modal.onclick=e=>{ if(e.target===modal) closeModal() };
+  setTimeout(()=>(modal.querySelector('input,button.primary,button')||modal).focus(),30) }
+function closeModal(){ modal.hidden=true; modal.innerHTML=''; lastFocus&&lastFocus.focus&&lastFocus.focus() }
+function openInfo(t,body){ openModal(`<div class="dialog" role="dialog" aria-modal="true" aria-label="${esc(t)}"><button class="x" aria-label="Закрыть">×</button><h2>${t}</h2>${body}</div>`) }
+function openShortlist(){
+  const items=SL.map(it=>{ const q=FLAT[it.num];
+    return `<div class="sitem"><span>${q?`<b>${q.num}</b> · ${q.type}, ${q.area} м² · <span class="pill ${q.status}">${STATUS[q.status]}</span><br><span class="note">${q.status==='sold'?'Продана':eur(q.price)}</span>`:`<b>${it.num}</b>`}</span>
+      <span class="acts">${q?`<button class="btn" data-open="${q.num}">Открыть</button>`:''}<button class="btn" data-rm="${it.num}" aria-label="Убрать ${it.num}">×</button></span>
+      ${SL_NOTES[it.num]?`<span class="warn">⚠ ${SL_NOTES[it.num]}</span>`:''}</div>` }).join('');
+  const sendable=SL.filter(it=>FLAT[it.num]&&FLAT[it.num].status!=='sold').map(it=>it.num);
+  openModal(`<div class="dialog" role="dialog" aria-modal="true" aria-label="Подборка"><button class="x" aria-label="Закрыть">×</button>
+    <h2>Подборка${SL.length?' · '+SL.length:''}</h2>
+    ${SL.length?`<p class="note">Хранится в этом браузере, регистрация не нужна. Добавление в подборку не бронирует квартиру.</p><div class="stack">${items}</div>
+      <button class="btn primary block" id="slSend" ${sendable.length?'':'disabled'}>Уточнить наличие и условия</button>
+      ${sendable.length<SL.length?'<p class="note">Проданные квартиры в запрос не попадут.</p>':''}`
+      :'<p class="muted" style="color:var(--muted)">Пока пусто. Нажмите ♡ на карточке квартиры, чтобы сохранить её здесь.</p>'}</div>`);
+  modal.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{ SL=SL.filter(x=>x.num!==b.dataset.rm); delete SL_NOTES[b.dataset.rm]; slSave(); syncSl(); openShortlist() });
+  modal.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{ closeModal(); go({page:b.dataset.open}) });
+  modal.querySelector('#slSend')?.addEventListener('click',()=>openForm(sendable));
+}
+$('#slBtn').onclick=openShortlist;
+
+/* ===================== Заявка ===================== */
+function requestText(nums,name,contact,note){
+  const lines=nums.map(n=>FLAT[n]).map(q=>`• ${q.num}: ${q.type}, ${q.area} м², корпус ${q.b}, ${q.floor} этаж, ${q.status==='sold'?'продана':eur(q.price)} (${STATUS[q.status].toLowerCase()})\n  ${linkOf(q.num)}`);
+  return `Новое обращение с сайта\nИмя: ${name||'не указано'}\nКонтакт: ${contact}\nПросит уточнить наличие и условия:\n${lines.join('\n')}${note?'\nКомментарий: '+note:''}`;
+}
+function openForm(nums){
+  nums=nums.filter(n=>FLAT[n]);
+  openModal(`<form class="dialog" id="reqForm" novalidate role="dialog" aria-modal="true" aria-label="Уточнить наличие и условия"><button type="button" class="x" aria-label="Закрыть">×</button>
+    <h2>Уточнить наличие и условия</h2>
+    <div class="stack">${nums.map(n=>{ const q=FLAT[n]; return `<div class="sitem"><span><b>${q.num}</b> · ${q.type}, ${q.area} м² · ${eur(q.price)}</span><span class="pill ${q.status}">${STATUS[q.status]}</span></div>` }).join('')}</div>
+    <label class="field">Как к вам обращаться<input id="rqName" autocomplete="name"></label>
+    <label class="field">Телефон, WhatsApp или e-mail<input id="rqPhone" autocomplete="tel" placeholder="+90 5xx xxx xx xx" required></label>
+    <label class="field">Комментарий<textarea id="rqNote" placeholder="Например: удобно связаться после 18:00"></textarea></label>
+    <p class="err" id="rqErr" hidden>Укажите телефон или e-mail, чтобы менеджер мог ответить.</p>
+    <p class="note">Это запрос информации, а не бронирование.</p>
+    <button class="btn primary block" type="submit">Отправить запрос</button></form>`);
+  modal.querySelector('#reqForm').onsubmit=e=>{ e.preventDefault();
+    const c=$('#rqPhone').value.trim(), ok=c.replace(/\D/g,'').length>=7 || /\S+@\S+\.\S+/.test(c);
+    if(!ok){ $('#rqErr').hidden=false; $('#rqPhone').focus(); return }
+    const text=requestText(nums,$('#rqName').value.trim(),c,$('#rqNote').value.trim());
+    openInfo('Запрос не отправлен', `<div class="demo-warn"><b>Демо не подключено к отправке.</b> Менеджер ничего не получил. На сайте после отправки покупатель увидит: «Обращение получено. Менеджер свяжется с вами и подтвердит наличие. Это не бронирование».</div>
+      <p class="note">Вот что пришло бы менеджеру в Bitrix24:</p><div class="msg">${esc(text)}</div><button class="btn primary" id="okDone">Понятно</button>`);
+    $('#okDone').onclick=closeModal;
+  };
+}
+
+/* ===================== Режим «Продажи» ===================== */
+function kpis(){
+  const all=ALL(), c=st=>all.filter(q=>q.status===st), pct=v=>Math.round(v/all.length*100)+'%';
+  const items=[['Корпусов',BUILDINGS.length,''],['Квартир',all.length,''],['Продано',c('sold').length,pct(c('sold').length)],
+    ['В брони',c('booked').length,pct(c('booked').length)],['Свободно',c('free').length,'от '+eur(minOf(c('free')))],
+    ['Продано на',meur(sum(c('sold'))),''],['Остаток в продаже',meur(sum(c('free'))),'']];
+  $('#kpis').innerHTML=items.map(([l,v,s])=>`<div class="kpi"><span>${l}</span><b>${v}</b>${s?`<small>${s}</small>`:''}</div>`).join('');
+}
+function setMode(m){ MODE=m; document.querySelectorAll('#fMode button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.v===m)); if(!CUR.page) renderPicker(CUR,false); else renderTop() }
+document.querySelectorAll('#fMode button').forEach(b=>b.onclick=()=>setMode(b.dataset.v));
+
+/* ===================== Разметка этажей (для сотрудника, режим «Продажи») ===================== */
+const mkBar=$('#mkBar'); let MK=null;
+function svgPt(e){ const pt=svgEl.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY; const r=pt.matrixTransform(svgEl.getScreenCTM().inverse()); return [Math.round(r.x),Math.round(r.y)] }
+const MK_TEXT={p:['Шаг 1 из 3 · Контур корпуса','Кликайте по углам корпуса по кругу, включая крышу. Можно оставить старый контур.'],
+  t:['Шаг 2 из 3 · Верх верхнего этажа','Слева направо по линии потолка верхнего этажа, точка на каждом изломе фасада.'],
+  bt:['Шаг 3 из 3 · Низ первого этажа','Столько же точек в том же порядке по линии пола первого этажа.'],done:['Проверьте этажи','Пунктир показывает границы этажей.']};
+function mkDraw(){ let g=svgEl.querySelector('#mk'); if(!g){ g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.id='mk'; g.setAttribute('pointer-events','none'); svgEl.appendChild(g) }
+  const k=svgEl.viewBox.baseVal.height/700, col={p:'#fff',t:'#3fd0ff',bt:'#ff5ad1'}; let h='';
+  ['p','t','bt'].forEach(key=>{ const a=MK[key]; if(!a.length) return; const closed=key==='p'&&MK.step!=='p';
+    h+=`<polyline points="${pts(closed?a.concat([a[0]]):a)}" fill="none" stroke="${col[key]}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
+    a.forEach(q=>h+=`<circle cx="${q[0]}" cy="${q[1]}" r="${4*k}" fill="${col[key]}" stroke="#000" vector-effect="non-scaling-stroke"/>`) });
+  if(MK.t.length>=2&&MK.bt.length===MK.t.length) for(let i=1;i<MK.f;i++) h+=`<polyline points="${pts(MK.t.map((q,j)=>[q[0]+(MK.bt[j][0]-q[0])*i/MK.f,q[1]+(MK.bt[j][1]-q[1])*i/MK.f]))}" fill="none" stroke="#ffc070" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>`;
+  g.innerHTML=h }
+function mkUI(){ const st=MK.step, [t,x]=MK_TEXT[st], need=st==='bt'?` Нужно точек: ${MK.t.length}, поставлено: ${MK.bt.length}.`:'';
+  mkBar.innerHTML=`<b>${t}</b><p>${x}${need}</p><label>Жилых этажей <select id="mkF">${[...Array(14)].map((_,i)=>i+2).map(n=>`<option ${n===MK.f?'selected':''}>${n}</option>`).join('')}</select></label>
+    <div class="acts">${st!=='done'?'<button class="btn" id="mkUndo">↶ Точка</button>':''}${st==='p'?'<button class="btn" id="mkSkip">Оставить контур</button>':''}${st==='p'||st==='t'?'<button class="btn primary" id="mkNext">Далее</button>':''}${st==='done'?'<button class="btn" id="mkRedo">Заново</button><button class="btn primary" id="mkSave">Сохранить</button>':''}<button class="btn" id="mkCancel">Отмена</button></div>`;
+  mkBar.hidden=false; const on=(id,fn)=>{ const el=document.getElementById(id); el&&(el.onclick=fn) };
+  $('#mkF').onchange=e=>{ MK.f=+e.target.value; mkDraw() };
+  on('mkUndo',()=>{ const a=MK[st]; if(a.length) a.pop(); else if(st==='bt') MK.step='t'; else if(st==='t') MK.step='p'; mkDraw(); mkUI() });
+  on('mkSkip',()=>{ MK.p=MK.b.g.p.map(q=>q.slice()); MK.step='t'; mkDraw(); mkUI() });
+  on('mkNext',()=>{ if(st==='p'){ if(MK.p.length<3) return; MK.step='t' } else { if(MK.t.length<2) return; MK.step='bt' } mkDraw(); mkUI() });
+  on('mkRedo',()=>{ MK.t=[]; MK.bt=[]; MK.step='t'; mkDraw(); mkUI() });
+  on('mkCancel',mkStop); on('mkSave',mkSave) }
+function mkStart(){ if(CUR.level!=='facade') return; hideTip(); MK={b:BY[CUR.b],step:'p',p:[],t:[],bt:[],f:BY[CUR.b].floors};
+  svgEl.classList.add('marking'); svgEl.querySelector('#bands').style.opacity=.15; svgEl.querySelector('#lbls').style.opacity=.3;
+  svgEl.addEventListener('click',mkClick); mkDraw(); mkUI() }
+function mkClick(e){ if(!MK) return; e.stopPropagation(); const q=svgPt(e);
+  if(MK.step==='p') MK.p.push(q); else if(MK.step==='t') MK.t.push(q); else if(MK.step==='bt'){ MK.bt.push(q); if(MK.bt.length===MK.t.length) MK.step='done' }
+  mkDraw(); mkUI() }
+function mkStop(){ MK=null; mkBar.hidden=true; mountedSig=''; if(!CUR.page) mountScene(null,false) }
+function mkSave(){ const b=MK.b, g={f:MK.f,p:MK.p.length>=3?MK.p:b.g.p,t:MK.t,b:MK.bt};
+  SAVED[b.id]=g; try{ localStorage.setItem('floorMarkup',JSON.stringify(SAVED)) }catch(e){}
+  setGeo(b,g); MK=null; mkBar.hidden=true; mountedSig=''; renderPicker(CUR,false) }
+function mkExport(){ const box=$('#mkExport'), n=Object.keys(SAVED).length;
+  if(!n||MODE!=='sales'){ box.hidden=true; return } box.hidden=false;
+  box.innerHTML=`<b>Своя разметка: ${Object.keys(SAVED).join(', ')}</b><span>Сохранена только в этом браузере. Скопируйте текст и пришлите в чат, я встрою её в демо.</span>
+    <textarea readonly id="mkText">${esc(JSON.stringify(SAVED))}</textarea><div class="ctx"><button class="btn primary" id="mkCopy">Скопировать</button><button class="btn" id="mkReset">Сбросить свою разметку</button></div>`;
+  $('#mkCopy').onclick=async()=>{ try{ await navigator.clipboard.writeText($('#mkText').value); toast('Скопировано') }catch(e){ $('#mkText').select() } };
+  $('#mkReset').onclick=()=>{ SAVED={}; try{ localStorage.removeItem('floorMarkup') }catch(e){} location.reload() } }
+
+/* ===================== Показ возможностей ===================== */
+function hoverZone(sel){ const el=svgEl&&svgEl.querySelector(sel); if(!el) return; hov(el,true); showTip(el.dataset.z==='band'?'f'+el.dataset.key:el.dataset.key, el) }
+const TB='L', TF=(BY.L.flats.find(x=>x.n===9&&x.status==='free')||{floor:1}).floor;
+const TQ=()=>BY.L.flats.find(x=>x.floor===TF&&x.n===9&&x.status==='free')||BY.L.flats.find(x=>x.floor===TF&&x.status==='free');
+const TOUR=[
+  ['Весь комплекс на одном экране. Сверху короткая сводка и фильтры, на метках корпусов число свободных квартир.', async()=>{ closeModal(); setMode('buyer'); F.type='all';F.min=null;F.max=null; go({},{force:true}); scrollTo(0,0) }],
+  ['Наведение на корпус показывает короткую подсказку. Список и карточка при этом не перестраиваются.', async()=>{ await wait(200); hoverZone(`.bld[data-key="${TB}"]`) }],
+  ['Нажатие фиксирует выбор: справа карточка корпуса с планировками и ценой, снизу только его квартиры.', async()=>{ hideTip(); go({b:TB}) }],
+  ['«Выбрать этаж»: камера приближается к фасаду, на каждом этаже видно число свободных квартир.', async()=>{ go({b:TB,level:'facade'}); await wait(750) }],
+  ['Нажатие на этаж открывает его план целиком, со статусами всех квартир. План можно увеличить и подвинуть.', async()=>{ go({b:TB,f:TF,level:'floor'}); await wait(350) }],
+  ['Выбор квартиры подсвечивает её на плане и показывает краткую карточку. Масштаб плана не меняется.', async()=>{ go({b:TB,f:TF,level:'floor',sel:TQ().num},{replace:true}) }],
+  ['«Подробнее» открывает отдельную страницу квартиры со своей ссылкой: планировка, расположение на этаже, условия, похожие варианты.', async()=>{ go({page:TQ().num}) }],
+  ['Покупатель сохраняет квартиры в подборку без регистрации и отправляет один запрос. В демо честно показано, что запрос никуда не ушёл.', async()=>{ const q=TQ(); if(!slHas(q.num)) slToggle(q.num); await wait(300); openForm([q.num]) }],
+  ['Режим «Продажи» для руководителя: сводка продаж и корпуса, окрашенные по доле проданного.', async()=>{ closeModal(); MODE='sales'; go({},{force:true}); setMode('sales'); scrollTo(0,0) }],
+];
+let tourI=-1;
+async function tourGo(i){ tourI=i; if(i>=TOUR.length) return tourEnd();
+  $('#tour').hidden=false; $('#tourStep').textContent=`Шаг ${i+1} из ${TOUR.length}`; $('#tourText').textContent=TOUR[i][0];
+  $('#tourNext').textContent=i===TOUR.length-1?'Готово':'Далее →'; $('#tourNext').disabled=true;
+  try{ await TOUR[i][1]() } finally { $('#tourNext').disabled=false; $('#tourNext').focus({preventScroll:true}) } }
+function tourEnd(){ tourI=-1; $('#tour').hidden=true; hideTip() }
+$('#tourBtn').onclick=()=>tourGo(0); $('#tourNext').onclick=()=>tourGo(tourI+1); $('#tourStop').onclick=tourEnd;
+
+/* ===================== Клавиатура и запуск ===================== */
+document.addEventListener('keydown',e=>{ if(e.key!=='Escape') return;
+  if(!modal.hidden) return closeModal();
+  if($('#fbar').classList.contains('open')) return sheet(false);
+  const fs=document.querySelector('.fs'); if(fs){ fsToggle(fs,false); if(fs.id==='gal'&&CUR.page) renderGal(FLAT[CUR.page]); return }
+  if(MK) return mkStop();
+  if(!$('#tour').hidden) return tourEnd(); });
+{ const {st,flt}=parse(location.hash); Object.assign(F,flt); APPLIED=''; CUR={level:'complex',b:null,f:null,sel:null,page:null}; apply(st,{}); BOOTED=true; try{ history.replaceState(null,'',hashOf(st)) }catch(e){} }
+</script>
